@@ -1,14 +1,8 @@
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Controls;
 
 namespace FluxDisplay.App;
 
-public sealed partial class MainWindow : Window
+public sealed partial class MainPage : Page
 {
-    public MainWindow()
-    {
-        InitializeComponent();
-        SystemBackdrop = new MicaBackdrop();
-        ExtendsContentIntoTitleBar = true;
-    }
+    public MainPage() => InitializeComponent();
 }
