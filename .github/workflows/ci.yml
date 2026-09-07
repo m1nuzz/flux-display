@@ -49,18 +49,30 @@ jobs:
         run: dotnet restore src/FluxDisplay.App/FluxDisplay.App.csproj -p:Platform=x64
 
       - name: Publish portable x64 application
-        run: >-
-          dotnet publish src/FluxDisplay.App/FluxDisplay.App.csproj
-          --configuration Release
-          --framework net8.0-windows10.0.22621.0
-          --runtime win-x64
-          --self-contained true
-          --output ./artifacts/FluxDisplay-win-x64
-          -p:Platform=x64
-          -p:WindowsAppSDKSelfContained=true
-          -p:PublishReadyToRun=false
-          -p:DebugType=None
-          -p:DebugSymbols=false
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          dotnet publish src/FluxDisplay.App/FluxDisplay.App.csproj `
+            --configuration Release `
+            --framework net8.0-windows10.0.22621.0 `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./artifacts/FluxDisplay-win-x64 `
+            -p:Platform=x64 `
+            -p:WindowsAppSDKSelfContained=true `
+            -p:PublishReadyToRun=false `
+            -p:DebugType=None `
+            -p:DebugSymbols=false
+          $exitCode = $LASTEXITCODE
+          if ($exitCode -ne 0) {
+            Write-Host '--- XAML/compiler diagnostic files ---'
+            Get-ChildItem -Path . -Recurse -File -Include input.json,output.json,*.log -ErrorAction SilentlyContinue |
+              ForEach-Object {
+                Write-Host "--- $($_.FullName) ---"
+                Get-Content -LiteralPath $_.FullName -Raw -ErrorAction SilentlyContinue
+              }
+            exit $exitCode
+          }
 
       - name: Add portable launch instructions
         shell: pwsh
