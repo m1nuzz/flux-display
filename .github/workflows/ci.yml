@@ -127,8 +127,6 @@ jobs:
       - name: Build MSIX package (single-project MSIX)
         shell: pwsh
         run: |
-          $pfxPath = Join-Path $PWD 'GitHubActionsWorkflow.pfx'
-          if (-not (Test-Path $pfxPath)) { throw "Signing certificate PFX not found at $pfxPath" }
           $pkgDir = Join-Path $PWD 'artifacts/Packages'
           New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
           msbuild FluxDisplay.sln `
@@ -136,13 +134,33 @@ jobs:
             /p:Platform=x64 `
             /p:UapAppxPackageBuildMode=SideloadOnly `
             /p:AppxBundle=Never `
-            /p:PackageCertificateKeyFile="$pfxPath" `
-            /p:PackageCertificatePassword=FluxDisplay-CI-Only `
             /p:AppxPackageDir="$pkgDir\\" `
-            /p:GenerateAppxPackageOnBuild=true
+            /p:GenerateAppxPackageOnBuild=true `
+            /p:AppxPackageSigningEnabled=false
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Write-Host "MSIX build completed. Listing Packages directory:"
+          Write-Host "MSIX build completed (unsigned). Listing Packages directory:"
           Get-ChildItem -Path "$pkgDir" -Recurse | Format-Table FullName, Length -AutoSize | Out-String -Width 300 | Write-Host
+
+      - name: Sign MSIX with CI test certificate
+        shell: pwsh
+        run: |
+          $pfxPath = Join-Path $PWD 'GitHubActionsWorkflow.pfx'
+          if (-not (Test-Path $pfxPath)) { throw "Signing certificate PFX not found at $pfxPath" }
+          $pkgDir = Join-Path $PWD 'artifacts/Packages'
+          $msix = Get-ChildItem -Path $pkgDir -Filter *.msix -Recurse | Select-Object -First 1
+          if (-not $msix) {
+            Write-Host "No MSIX found under $pkgDir"
+            Get-ChildItem -Path . -Filter *.msix -Recurse | ForEach-Object { Write-Host $_.FullName }
+            throw "MSIX package was not generated for signing."
+          }
+          $signtool = Get-ChildItem "$env:ProgramFiles (x86)/Windows Kits/10/bin" -Filter signtool.exe -Recurse | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { throw 'signtool.exe was not found on the Windows runner.' }
+          Write-Host "Signing $($msix.FullName) with test certificate"
+          & $signtool.FullName sign /fd SHA256 /f $pfxPath /p 'FluxDisplay-CI-Only' "$($msix.FullName)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "Signed successfully, verifying:"
+          & $signtool.FullName verify /pa "$($msix.FullName)"
+          if ($LASTEXITCODE -ne 0) { Write-Host "Verify returned $LASTEXITCODE (may be expected for test cert)" }
 
       - name: Normalize MSIX artifact name
         shell: pwsh
