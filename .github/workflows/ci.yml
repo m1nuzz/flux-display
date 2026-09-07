@@ -31,3 +31,57 @@ jobs:
           test -f tests/FluxDisplay.Core.Tests/FluxDisplay.Core.Tests.csproj
           grep -q "FluxDisplay.Core" FluxDisplay.sln
           grep -q "FluxDisplay.Core.Tests" FluxDisplay.sln
+
+  windows-portable-build:
+    name: Windows portable application build
+    runs-on: windows-latest
+    needs: core-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore WinUI application
+        run: dotnet restore src/FluxDisplay.App/FluxDisplay.App.csproj -p:Platform=x64
+
+      - name: Publish portable x64 application
+        run: >-
+          dotnet publish src/FluxDisplay.App/FluxDisplay.App.csproj
+          --configuration Release
+          --framework net8.0-windows10.0.22621.0
+          --runtime win-x64
+          --self-contained true
+          --output ./artifacts/FluxDisplay-win-x64
+          -p:Platform=x64
+          -p:WindowsAppSDKSelfContained=true
+          -p:PublishReadyToRun=false
+          -p:DebugType=None
+          -p:DebugSymbols=false
+
+      - name: Add portable launch instructions
+        shell: pwsh
+        run: |
+          @'
+          # FluxDisplay portable build
+
+          1. Extract this ZIP on Windows 11 x64.
+          2. Run `FluxDisplay.App.exe`.
+          3. Windows App SDK runtime is included in this self-contained build.
+          4. The application is currently an unpackaged desktop build; no installer is required.
+          '@ | Set-Content ./artifacts/FluxDisplay-win-x64/README.txt
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: Compress-Archive -Path ./artifacts/FluxDisplay-win-x64/* -DestinationPath ./artifacts/FluxDisplay-win-x64-portable.zip
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FluxDisplay-win-x64-portable
+          path: ./artifacts/FluxDisplay-win-x64-portable.zip
+          if-no-files-found: error
+          retention-days: 14
