@@ -1,6 +1,5 @@
-<Application x:Class="FluxDisplay.App.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="using:Microsoft.UI.Xaml.Controls" RequestedTheme="Dark">
+<Application x:Class="FluxDisplay.App.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Application.Resources>
-    <controls:XamlControlsResources />
     <SolidColorBrush x:Key="PageBackgroundBrush" Color="#081827" />
     <SolidColorBrush x:Key="CardBackgroundBrush" Color="#102438" />
   </Application.Resources>
