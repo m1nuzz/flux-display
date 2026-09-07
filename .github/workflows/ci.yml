@@ -52,13 +52,17 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path ./artifacts | Out-Null
-          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=FluxDisplay' -CertStoreLocation 'Cert:\CurrentUser\My' -NotAfter (Get-Date).AddYears(2)
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=FluxDisplay' -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -KeyExportPolicy Exportable -CertStoreLocation 'Cert:\CurrentUser\My' -NotAfter (Get-Date).AddYears(2)
           $pfxPath = Join-Path $PWD 'GitHubActionsWorkflow.pfx'
           $cerPath = Join-Path $PWD 'artifacts/FluxDisplay-ci-signing.cer'
           $password = ConvertTo-SecureString 'FluxDisplay-CI-Only' -AsPlainText -Force
           Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $password | Out-Null
           Export-Certificate -Cert $cert -FilePath $cerPath -Type CERT | Out-Null
-          Write-Host "Created test certificate for CN=FluxDisplay"
+          # Re-import to ensure MSBuild import task succeeds (workaround for APPX0105)
+          Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $password -Exportable | Out-Null
+          "CERT_THUMBPRINT=$($cert.Thumbprint)" | Out-File -FilePath ./artifacts/cert-thumbprint.txt
+          Add-Content -Path $env:GITHUB_ENV -Value "CERT_THUMBPRINT=$($cert.Thumbprint)"
+          Write-Host "Created test certificate CN=FluxDisplay thumbprint $($cert.Thumbprint)"
 
       - name: Restore solution
         run: msbuild FluxDisplay.sln /t:Restore /p:Configuration=Release /p:Platform=x64
