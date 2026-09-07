@@ -113,7 +113,7 @@ jobs:
           [IO.File]::WriteAllBytes("$packageRoot/Assets/Square150x150Logo.png", [Convert]::FromBase64String($png))
           @'
           <?xml version="1.0" encoding="utf-8"?>
-          <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" IgnorableNamespaces="uap">
+          <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedCapabilities" IgnorableNamespaces="uap rescap">
             <Identity Name="m1nuzz.fluxdisplay" Publisher="CN=FluxDisplay" Version="1.0.0.0" />
             <Properties>
               <DisplayName>FluxDisplay</DisplayName>
@@ -128,6 +128,9 @@ jobs:
                 <uap:VisualElements AppListEntry="none" DisplayName="FluxDisplay" Description="Display preset manager" BackgroundColor="#081827" Square44x44Logo="Assets/Square44x44Logo.png" Square150x150Logo="Assets/Square150x150Logo.png" />
               </Application>
             </Applications>
+            <Capabilities>
+              <rescap:Capability Name="runFullTrust" />
+            </Capabilities>
           </Package>
           '@ | Set-Content "$packageRoot/AppxManifest.xml" -Encoding UTF8
 
