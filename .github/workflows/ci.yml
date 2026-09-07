@@ -32,8 +32,8 @@ jobs:
           grep -q "FluxDisplay.Core" FluxDisplay.sln
           grep -q "FluxDisplay.Core.Tests" FluxDisplay.sln
 
-  windows-portable-build:
-    name: Windows portable application build
+  windows-build:
+    name: Windows portable + MSIX build
     runs-on: windows-latest
     needs: core-tests
     steps:
@@ -45,10 +45,27 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Restore WinUI application
-        run: dotnet restore src/FluxDisplay.App/FluxDisplay.App.csproj -p:Platform=x64
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
 
-      - name: Publish portable x64 application
+      - name: Create test signing certificate
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ./artifacts | Out-Null
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=FluxDisplay' -CertStoreLocation 'Cert:\CurrentUser\My' -NotAfter (Get-Date).AddYears(2)
+          $pfxPath = Join-Path $PWD 'GitHubActionsWorkflow.pfx'
+          $cerPath = Join-Path $PWD 'artifacts/FluxDisplay-ci-signing.cer'
+          $password = ConvertTo-SecureString 'FluxDisplay-CI-Only' -AsPlainText -Force
+          Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $password | Out-Null
+          Export-Certificate -Cert $cert -FilePath $cerPath -Type CERT | Out-Null
+          Write-Host "Created test certificate for CN=FluxDisplay"
+
+      - name: Restore solution
+        run: msbuild FluxDisplay.sln /t:Restore /p:Configuration=Release
+        env:
+          Configuration: Release
+
+      - name: Publish portable x64 (unpackaged, self-contained)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
@@ -59,7 +76,9 @@ jobs:
             --self-contained true `
             --output ./artifacts/FluxDisplay-win-x64 `
             -p:Platform=x64 `
+            -p:WindowsPackageType=None `
             -p:WindowsAppSDKSelfContained=true `
+            -p:GenerateAppxPackageOnBuild=false `
             -p:PublishReadyToRun=false `
             -p:DebugType=None `
             -p:DebugSymbols=false
@@ -99,77 +118,64 @@ jobs:
 
       - name: Create portable ZIP
         shell: pwsh
-        run: Compress-Archive -Path ./artifacts/FluxDisplay-win-x64/* -DestinationPath ./artifacts/FluxDisplay-win-x64-portable.zip
+        run: Compress-Archive -Path ./artifacts/FluxDisplay-win-x64/* -DestinationPath ./artifacts/FluxDisplay-win-x64-portable.zip -Force
 
-      - name: Prepare installer package files
+      - name: Build MSIX package (single-project MSIX)
         shell: pwsh
         run: |
-          $packageRoot = Join-Path $PWD 'artifacts/msix-package'
-          New-Item -ItemType Directory -Force -Path "$packageRoot/Assets" | Out-Null
-          Copy-Item './artifacts/FluxDisplay-win-x64/*' $packageRoot -Recurse -Force
-          $png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
-          [IO.File]::WriteAllBytes("$packageRoot/Assets/StoreLogo.png", [Convert]::FromBase64String($png))
-          [IO.File]::WriteAllBytes("$packageRoot/Assets/Square44x44Logo.png", [Convert]::FromBase64String($png))
-          [IO.File]::WriteAllBytes("$packageRoot/Assets/Square150x150Logo.png", [Convert]::FromBase64String($png))
-          @'
-          <?xml version="1.0" encoding="utf-8"?>
-          <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedCapabilities" IgnorableNamespaces="uap rescap">
-            <Identity Name="m1nuzz.fluxdisplay" Publisher="CN=FluxDisplay" Version="1.0.0.0" />
-            <Properties>
-              <DisplayName>FluxDisplay</DisplayName>
-              <PublisherDisplayName>FluxDisplay</PublisherDisplayName>
-              <Logo>Assets/StoreLogo.png</Logo>
-            </Properties>
-            <Dependencies>
-              <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22621.0" MaxVersionTested="10.0.26100.0" />
-            </Dependencies>
-            <Applications>
-              <Application Id="FluxDisplay" Executable="FluxDisplay.App.exe" EntryPoint="Windows.FullTrustApplication">
-                <uap:VisualElements AppListEntry="none" DisplayName="FluxDisplay" Description="Display preset manager" BackgroundColor="#081827" Square44x44Logo="Assets/Square44x44Logo.png" Square150x150Logo="Assets/Square150x150Logo.png" />
-              </Application>
-            </Applications>
-            <Capabilities>
-              <rescap:Capability Name="runFullTrust" />
-            </Capabilities>
-          </Package>
-          '@ | Set-Content "$packageRoot/AppxManifest.xml" -Encoding UTF8
-
-      - name: Create MSIX installer
-        shell: pwsh
-        run: |
-          $makeAppx = Get-ChildItem "$env:ProgramFiles (x86)/Windows Kits/10/bin" -Filter MakeAppx.exe -Recurse | Sort-Object FullName -Descending | Select-Object -First 1
-          if (-not $makeAppx) { throw 'MakeAppx.exe was not found on the Windows runner.' }
-          & $makeAppx.FullName pack /d "$PWD/artifacts/msix-package" /p "$PWD/artifacts/FluxDisplay-win-x64-installer.msix" /o
+          $pfxPath = Join-Path $PWD 'GitHubActionsWorkflow.pfx'
+          if (-not (Test-Path $pfxPath)) { throw "Signing certificate PFX not found at $pfxPath" }
+          $pkgDir = Join-Path $PWD 'artifacts/Packages'
+          New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
+          msbuild FluxDisplay.sln `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:UapAppxPackageBuildMode=SideloadOnly `
+            /p:AppxBundle=Never `
+            /p:PackageCertificateKeyFile="$pfxPath" `
+            /p:PackageCertificatePassword=FluxDisplay-CI-Only `
+            /p:AppxPackageDir="$pkgDir\\" `
+            /p:GenerateAppxPackageOnBuild=true
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "MSIX build completed. Listing Packages directory:"
+          Get-ChildItem -Path "$pkgDir" -Recurse | Format-Table FullName, Length -AutoSize | Out-String -Width 300 | Write-Host
 
-      - name: Sign MSIX installer with CI test certificate
+      - name: Normalize MSIX artifact name
         shell: pwsh
         run: |
-          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=FluxDisplay' -CertStoreLocation 'Cert:\CurrentUser\My'
-          $pfxPath = Join-Path $PWD 'artifacts/FluxDisplay-ci-signing.pfx'
-          $cerPath = Join-Path $PWD 'artifacts/FluxDisplay-ci-signing.cer'
-          $password = ConvertTo-SecureString 'FluxDisplay-CI-Only' -AsPlainText -Force
-          Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $password | Out-Null
-          Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
-          $signtool = Get-ChildItem "$env:ProgramFiles (x86)/Windows Kits/10/bin" -Filter signtool.exe -Recurse | Sort-Object FullName -Descending | Select-Object -First 1
-          if (-not $signtool) { throw 'signtool.exe was not found on the Windows runner.' }
-          & $signtool.FullName sign /fd SHA256 /f $pfxPath /p 'FluxDisplay-CI-Only' "$PWD/artifacts/FluxDisplay-win-x64-installer.msix"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Remove-Item $pfxPath -Force
+          $pkgDir = Join-Path $PWD 'artifacts/Packages'
+          $msix = Get-ChildItem -Path $pkgDir -Filter *.msix -Recurse | Select-Object -First 1
+          if (-not $msix) {
+            Write-Host "No MSIX found under $pkgDir, searching whole repo"
+            Get-ChildItem -Path . -Filter *.msix -Recurse | ForEach-Object { Write-Host $_.FullName }
+            throw "MSIX package was not generated."
+          }
+          $dest = Join-Path $PWD 'artifacts/FluxDisplay-win-x64-installer.msix'
+          Copy-Item -LiteralPath $msix.FullName -Destination $dest -Force
+          Write-Host "Copied MSIX $($msix.FullName) -> $dest ($([math]::Round((Get-Item $dest).Length/1MB,2)) MB)"
+
+      - name: Remove PFX after build
+        if: always()
+        shell: pwsh
+        run: |
+          $pfxPath = Join-Path $PWD 'GitHubActionsWorkflow.pfx'
+          if (Test-Path $pfxPath) { Remove-Item -LiteralPath $pfxPath -Force -ErrorAction SilentlyContinue }
 
       - name: Create installer ZIP and install instructions
         shell: pwsh
         run: |
           @'
-          # FluxDisplay installer
+          # FluxDisplay installer (MSIX, test-signed)
 
           1. Import `FluxDisplay-ci-signing.cer` into Trusted People if Windows blocks the test-signed package.
+             - Double-click the .cer -> Install Certificate -> Local Machine -> Place all certificates in Trusted People.
           2. Double-click `FluxDisplay-win-x64-installer.msix` and choose Install.
           3. The certificate is for CI/testing only and is not a commercial publisher certificate.
+          4. Portable version is also available: FluxDisplay-win-x64-portable.zip (no install required).
           '@ | Set-Content ./artifacts/INSTALL-MSIX.txt
-          Compress-Archive -Path ./artifacts/FluxDisplay-win-x64-installer.msix,./artifacts/FluxDisplay-ci-signing.cer,./artifacts/INSTALL-MSIX.txt -DestinationPath ./artifacts/FluxDisplay-win-x64-installer.zip
+          Compress-Archive -Path ./artifacts/FluxDisplay-win-x64-installer.msix,./artifacts/FluxDisplay-ci-signing.cer,./artifacts/INSTALL-MSIX.txt -DestinationPath ./artifacts/FluxDisplay-win-x64-installer.zip -Force
 
-      - name: Upload portable and installer artifact
+      - name: Upload portable and installer artifacts
         uses: actions/upload-artifact@v4
         with:
           name: FluxDisplay-win-x64-distributions
