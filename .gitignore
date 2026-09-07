@@ -1,0 +1,19 @@
+# Build output
+bin/
+obj/
+.vs/
+*.user
+*.suo
+TestResults/
+
+# Rider / tooling
+.idea/
+
+# Generated Windows App SDK files
+Generated Files/
+AppPackages/
+BundleArtifacts/
+
+# Local environment
+.env
+*.userprefs

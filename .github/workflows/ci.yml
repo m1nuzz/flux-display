@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  core-tests:
+    name: Core unit tests and smoke checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore src/FluxDisplay.Core/FluxDisplay.Core.csproj
+      - name: Build Core
+        run: dotnet build src/FluxDisplay.Core/FluxDisplay.Core.csproj --configuration Release --no-restore
+      - name: Restore tests
+        run: dotnet restore tests/FluxDisplay.Core.Tests/FluxDisplay.Core.Tests.csproj
+      - name: Run unit tests
+        run: dotnet test tests/FluxDisplay.Core.Tests/FluxDisplay.Core.Tests.csproj --configuration Release --no-restore --logger "trx;LogFileName=core-tests.trx"
+      - name: Smoke check required project files
+        shell: bash
+        run: |
+          test -f FluxDisplay.sln
+          test -f src/FluxDisplay.Core/FluxDisplay.Core.csproj
+          test -f tests/FluxDisplay.Core.Tests/FluxDisplay.Core.Tests.csproj
+          grep -q "FluxDisplay.Core" FluxDisplay.sln
+          grep -q "FluxDisplay.Core.Tests" FluxDisplay.sln
