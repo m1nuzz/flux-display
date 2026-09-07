@@ -61,7 +61,7 @@ jobs:
           Write-Host "Created test certificate for CN=FluxDisplay"
 
       - name: Restore solution
-        run: msbuild FluxDisplay.sln /t:Restore /p:Configuration=Release
+        run: msbuild FluxDisplay.sln /t:Restore /p:Configuration=Release /p:Platform=x64
         env:
           Configuration: Release
 
