@@ -198,7 +198,7 @@ public sealed class TrayService : ITrayService
     {
         try
         {
-            return new Uri("ms-appx:///Assets/StoreLogo.png");
+            return new Uri("ms-appx:///Assets/tray.ico");
         }
         catch
         {

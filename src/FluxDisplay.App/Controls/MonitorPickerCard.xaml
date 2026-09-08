@@ -1,0 +1,16 @@
+<UserControl
+    x:Class="FluxDisplay.App.Controls.MonitorPickerCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Style="{StaticResource FluxCardBorderStyle}" MinHeight="120">
+        <StackPanel Spacing="6">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon Glyph="&#xE7F4;" />
+                <TextBlock Text="{Binding DisplayTitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+            </StackPanel>
+            <TextBlock Text="{Binding ResolutionText}" Style="{StaticResource FluxMutedTextStyle}" />
+            <TextBlock Text="{Binding ScaleText}" Style="{StaticResource FluxMutedTextStyle}" />
+            <TextBlock Text="{Binding AdapterName}" Style="{StaticResource FluxMutedTextStyle}" />
+        </StackPanel>
+    </Border>
+</UserControl>

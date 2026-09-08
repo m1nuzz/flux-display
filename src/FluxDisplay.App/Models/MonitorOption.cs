@@ -1,5 +1,3 @@
-using FluxDisplay.Core.Models;
-
 namespace FluxDisplay.App.Models;
 
 public sealed class MonitorOption
@@ -13,10 +11,11 @@ public sealed class MonitorOption
     public required DisplayMode CurrentMode { get; init; }
     public required int CurrentDpi { get; init; }
     public required int ScalePercent { get; init; }
+    public bool IsSelected { get; set; }
 
-    public string DisplayTitle => $"{FriendlyName} ({DisplayName})";
-
+    public string DisplayTitle => IsPrimary ? $"{FriendlyName} (Primary)" : FriendlyName;
     public string ResolutionText => $"{CurrentMode.Width} × {CurrentMode.Height} @ {CurrentMode.RefreshRate} Hz";
+    public string ScaleText => $"{ScalePercent}% · {CurrentDpi} DPI";
 
     public static MonitorOption FromDisplayInfo(DisplayInfo info) => new()
     {

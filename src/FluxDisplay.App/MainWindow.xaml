@@ -1,5 +1,39 @@
-<Page x:Class="FluxDisplay.App.MainPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <Grid Background="{StaticResource PageBackgroundBrush}">
-    <TextBlock Text="FluxDisplay" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center" />
-  </Grid>
-</Page>
+<Window
+    x:Class="FluxDisplay.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:FluxDisplay.App.Controls"
+    xmlns:tb="using:H.NotifyIcon"
+    Title="flux-display">
+    <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" RequestedTheme="Dark">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <controls:HeaderBar x:Name="AppTitleBar" />
+        <NavigationView
+            x:Name="NavView"
+            Grid.Row="1"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            PaneDisplayMode="Left"
+            SelectionChanged="NavView_SelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Presets" Tag="presets" Icon="Home" />
+                <NavigationViewItem Content="Settings" Tag="settings">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE713;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            <Frame x:Name="ContentFrame" />
+        </NavigationView>
+        <controls:FooterFeatures Grid.Row="2" />
+        <tb:TaskbarIcon
+            x:Name="TrayIcon"
+            ToolTipText="flux-display"
+            IconSource="ms-appx:///Assets/tray.ico"
+            Visibility="Collapsed" />
+    </Grid>
+</Window>

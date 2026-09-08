@@ -1,5 +1,3 @@
-using FluxDisplay.Core.Models;
-
 namespace FluxDisplay.App.Models;
 
 public sealed class PresetCardModel
@@ -18,4 +16,5 @@ public sealed class PresetCardModel
     public string RefreshText => $"{Mode.RefreshRate} Hz";
     public string ScaleText => $"{ScalePercent}%";
     public string BitsText => $"{Mode.BitsPerPel} bit";
+    public string ModeText => Mode.ToString();
 }

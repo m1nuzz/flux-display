@@ -1,5 +1,3 @@
-using FluxDisplay.Core.Models;
-
 namespace FluxDisplay.App.Models;
 
 public sealed record ThemeOption(AppTheme Theme, string Label)
@@ -13,4 +11,6 @@ public sealed record ThemeOption(AppTheme Theme, string Label)
 
     public static ThemeOption FromTheme(AppTheme theme) =>
         All.FirstOrDefault(x => x.Theme == theme) ?? All[0];
+
+    public override string ToString() => Label;
 }

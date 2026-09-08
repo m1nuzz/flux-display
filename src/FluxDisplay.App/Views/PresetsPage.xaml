@@ -1,0 +1,59 @@
+<Page
+    x:Class="FluxDisplay.App.Views.PresetsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:FluxDisplay.App.Controls"
+    xmlns:converters="using:FluxDisplay.App.Converters"
+    xmlns:vm="using:FluxDisplay.App.ViewModels">
+    <Page.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    </Page.Resources>
+    <Grid Padding="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Your presets" Style="{StaticResource FluxPageTitleStyle}" />
+            <Button
+                Grid.Column="1"
+                Content="+ Add preset"
+                Style="{StaticResource AccentButtonStyle}"
+                Command="{Binding RequestAddCommand}" />
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}">
+            <ItemsRepeater ItemsSource="{Binding Items}">
+                <ItemsRepeater.Layout>
+                    <StackLayout Spacing="0" />
+                </ItemsRepeater.Layout>
+                <ItemsRepeater.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PresetViewModel">
+                        <controls:PresetCard DataContext="{Binding}" />
+                    </DataTemplate>
+                </ItemsRepeater.ItemTemplate>
+            </ItemsRepeater>
+        </ScrollViewer>
+
+        <StackPanel
+            Grid.RowSpan="2"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Spacing="12"
+            Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}">
+            <FontIcon Glyph="&#xE7F4;" FontSize="64" />
+            <TextBlock Text="No presets yet" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" />
+            <TextBlock Text="Create your first display preset." Style="{StaticResource FluxMutedTextStyle}" HorizontalAlignment="Center" />
+            <Button
+                Content="+ Add preset"
+                Style="{StaticResource AccentButtonStyle}"
+                HorizontalAlignment="Center"
+                Command="{Binding RequestAddCommand}" />
+        </StackPanel>
+    </Grid>
+</Page>

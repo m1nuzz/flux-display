@@ -1,0 +1,37 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Color x:Key="FluxDeepColor">#081827</Color>
+    <Color x:Key="FluxCardColor">#102438</Color>
+    <Color x:Key="FluxHeaderStartColor">#071A2F</Color>
+    <Color x:Key="FluxHeaderEndColor">#0A2540</Color>
+    <Color x:Key="FluxActiveColor">#1C7E36</Color>
+
+    <SolidColorBrush x:Key="PageBackgroundBrush" Color="{StaticResource FluxDeepColor}" />
+    <SolidColorBrush x:Key="CardBackgroundBrush" Color="{StaticResource FluxCardColor}" />
+    <SolidColorBrush x:Key="ActiveBadgeBrush" Color="{StaticResource FluxActiveColor}" />
+
+    <LinearGradientBrush x:Key="HeaderGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource FluxHeaderStartColor}" Offset="0" />
+        <GradientStop Color="{StaticResource FluxHeaderEndColor}" Offset="1" />
+    </LinearGradientBrush>
+
+    <Style x:Key="FluxCardBorderStyle" TargetType="Border">
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <Style x:Key="FluxPageTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="24" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="FluxMutedTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+</ResourceDictionary>

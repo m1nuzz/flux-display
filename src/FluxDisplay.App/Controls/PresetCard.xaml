@@ -1,0 +1,46 @@
+<UserControl
+    x:Class="FluxDisplay.App.Controls.PresetCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Style="{StaticResource FluxCardBorderStyle}" Margin="0,0,0,12">
+        <Grid ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Border Width="48" Height="48" CornerRadius="8" Background="#1AFFFFFF">
+                <FontIcon Glyph="&#xE7F4;" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="★" Opacity="0.7" />
+                    <Border
+                        Background="{StaticResource ActiveBadgeBrush}"
+                        CornerRadius="12"
+                        Padding="8,2"
+                        Visibility="{Binding IsActive, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="Active" FontSize="11" />
+                    </Border>
+                </StackPanel>
+                <TextBlock Text="{Binding MonitorName}" Style="{StaticResource FluxMutedTextStyle}" />
+                <TextBlock Text="{Binding ModeText}" Style="{StaticResource FluxMutedTextStyle}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button
+                    Content="Apply"
+                    Style="{StaticResource AccentButtonStyle}"
+                    Command="{Binding ApplyCommand}"
+                    CommandParameter="{Binding}" />
+                <Button Content="⋯">
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuFlyoutItem Text="Delete" Command="{Binding DeleteCommand}" CommandParameter="{Binding}" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>
