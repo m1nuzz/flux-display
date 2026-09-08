@@ -1,6 +1,8 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace FluxDisplay.App.Models;
 
-public sealed class MonitorOption
+public sealed partial class MonitorOption : ObservableObject
 {
     public required string DevicePath { get; init; }
     public required string DisplayName { get; init; }
@@ -11,7 +13,9 @@ public sealed class MonitorOption
     public required DisplayMode CurrentMode { get; init; }
     public required int CurrentDpi { get; init; }
     public required int ScalePercent { get; init; }
-    public bool IsSelected { get; set; }
+
+    [ObservableProperty]
+    private bool _isSelected;
 
     public string DisplayTitle => IsPrimary ? $"{FriendlyName} (Primary)" : FriendlyName;
     public string ResolutionText => $"{CurrentMode.Width} × {CurrentMode.Height} @ {CurrentMode.RefreshRate} Hz";
