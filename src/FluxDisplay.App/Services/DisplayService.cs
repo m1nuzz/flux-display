@@ -148,9 +148,9 @@ public sealed class DisplayService : IDisplayService
         }
     }
 
-    private static void TryEnumerateDisplaysFallback(List<DisplayInfo> result)
-    {
-        uint adapterIndex = 0;
+     private static void TryEnumerateDisplaysFallback(List<DisplayInfo> result)
+     {
+         uint adapterIndex = 0;
         while (true)
         {
             var adapter = new FluxDisplay.App.Native.DISPLAY_DEVICEW();
@@ -170,14 +170,8 @@ public sealed class DisplayService : IDisplayService
                 break;
             }
 
-            var isActive = (adapter.StateFlags & DISPLAY_DEVICE_ACTIVE) != 0;
-            var isMirroring = (adapter.StateFlags & DISPLAY_DEVICE_MIRRORING_DRIVER) != 0;
-            if (!isActive || isMirroring)
-            {
-                adapterIndex++;
-                continue;
-            }
-
+            // Do not filter adapters by StateFlags — multi-monitor GPUs share one adapter that may not have ACTIVE flag.
+            // Spec §6 filters only monitors, not adapters.
             var adapterName = adapter.DeviceName;
             uint monitorIndex = 0;
             while (true)
@@ -207,33 +201,40 @@ public sealed class DisplayService : IDisplayService
                     continue;
                 }
 
-                var deviceName = monitor.DeviceName;
-                if (string.IsNullOrWhiteSpace(deviceName))
-                {
-                    deviceName = adapterName;
-                }
-
-                var currentMode = GetCurrentModeInternal(deviceName);
+                // Use adapter name for mode/bounds — monitor.DeviceName is like \\.\DISPLAY1\Monitor0 which fails EnumDisplaySettingsEx/GetMonitorInfo.
+                var displayName = adapterName;
+                var currentMode = GetCurrentModeInternal(displayName);
                 if (currentMode is null)
                 {
                     monitorIndex++;
                     continue;
                 }
 
-                var dpi = TryGetDpi(deviceName);
-                var bounds = GetMonitorBounds(deviceName);
+                var dpi = TryGetDpi(displayName);
+                var bounds = GetMonitorBounds(displayName);
                 var isPrimary = (adapter.StateFlags & 0x4) != 0;
 
                 var friendly = monitor.DeviceString;
                 if (string.IsNullOrWhiteSpace(friendly))
                 {
-                    friendly = deviceName;
+                    friendly = displayName;
+                }
+
+                var devicePath = monitor.DeviceID;
+                if (string.IsNullOrWhiteSpace(devicePath))
+                {
+                    devicePath = adapter.DeviceID;
+                }
+
+                if (string.IsNullOrWhiteSpace(devicePath))
+                {
+                    devicePath = displayName;
                 }
 
                 result.Add(new DisplayInfo
                 {
-                    DevicePath = monitor.DeviceID,
-                    DisplayName = deviceName,
+                    DevicePath = devicePath,
+                    DisplayName = displayName,
                     FriendlyName = friendly,
                     AdapterName = adapter.DeviceString,
                     Bounds = bounds,

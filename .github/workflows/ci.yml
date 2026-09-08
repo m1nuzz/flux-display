@@ -69,6 +69,14 @@ jobs:
         env:
           Configuration: Release
 
+      - name: Run App smoke tests (automated, replaces Windows MCP)
+        shell: pwsh
+        run: |
+          dotnet test tests/FluxDisplay.App.Tests/FluxDisplay.App.Tests.csproj --configuration Release -p:Platform=x64 --verbosity minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pwsh -NoProfile -File ./scripts/smoke.ps1 -Configuration Release -Platform x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Publish portable x64 (unpackaged, self-contained)
         shell: pwsh
         run: |

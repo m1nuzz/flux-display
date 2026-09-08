@@ -66,7 +66,8 @@ public sealed partial class MonitorIdentifier : IMonitorIdentifier
                     var appWindow = AppWindow.GetFromWindowId(windowId);
                     if (appWindow is not null)
                     {
-                        appWindow.SetPresenter(AppWindowPresenterKind.FullScreen);
+                        // Use Overlapped presenter so MoveAndResize to specific monitor bounds works (FullScreen forces primary).
+                        appWindow.SetPresenter(AppWindowPresenterKind.Overlapped);
                         try
                         {
                             var rect = new global::Windows.Graphics.RectInt32
@@ -83,6 +84,7 @@ public sealed partial class MonitorIdentifier : IMonitorIdentifier
                         }
 
                         appWindow.IsShownInSwitchers = false;
+                        // Ensure borderless topmost via Overlapped presenter + SetWindowPos HWND_TOPMOST below
                     }
 
                     _ = SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
