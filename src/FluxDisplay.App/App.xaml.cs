@@ -23,7 +23,8 @@ public partial class App : Application
         var instance = AppInstance.FindOrRegisterForKey("flux-display-main");
         if (!instance.IsCurrent)
         {
-            instance.RedirectActivationToAsync(AppInstance.GetActivatedEventArgs()).AsTask().GetAwaiter().GetResult();
+            var redirectArgs = AppInstance.GetCurrent().GetActivatedEventArgs();
+            instance.RedirectActivationToAsync(redirectArgs).AsTask().GetAwaiter().GetResult();
             Current.Exit();
             return;
         }

@@ -29,7 +29,7 @@ public sealed partial class MainWindow : Window
     {
         await ViewModel.InitializeAsync().ConfigureAwait(true);
         Navigate("presets");
-        if (ViewModel.Settings.StartMinimized)
+        if (ViewModel.SettingsViewModel.StartMinimized)
         {
             HideToTray();
         }
@@ -82,7 +82,7 @@ public sealed partial class MainWindow : Window
         ViewModel.SelectedTag = tag;
         ContentFrame.Content = tag switch
         {
-            "settings" => new SettingsPage { DataContext = ViewModel.Settings },
+            "settings" => new SettingsPage { DataContext = ViewModel.SettingsViewModel },
             "create" => new CreatePresetPage { DataContext = ViewModel.Create },
             _ => new PresetsPage { DataContext = ViewModel.Presets }
         };
@@ -94,7 +94,7 @@ public sealed partial class MainWindow : Window
 
         if (tag == "settings")
         {
-            _ = ViewModel.Settings.LoadAsync();
+            _ = ViewModel.SettingsViewModel.LoadAsync();
         }
     }
 

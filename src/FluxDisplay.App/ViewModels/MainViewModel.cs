@@ -15,25 +15,25 @@ public sealed partial class MainViewModel : ObservableObject
         _services = services;
         Presets = new PresetsPageViewModel(services);
         Create = new CreatePresetViewModel(services);
-        Settings = new SettingsViewModel(services);
+        SettingsViewModel = new SettingsViewModel(services);
         SelectedTag = "presets";
     }
 
     public PresetsPageViewModel Presets { get; }
     public CreatePresetViewModel Create { get; }
-    public SettingsViewModel Settings { get; }
+    public SettingsViewModel SettingsViewModel { get; }
 
     [ObservableProperty]
     private string _selectedTag = "presets";
 
     [ObservableProperty]
-    private AppSettings _settings = new();
+    private AppSettings _currentSettings = new();
 
     public async Task InitializeAsync()
     {
-        Settings = await _services.SettingsStore.LoadAsync().ConfigureAwait(true);
-        Settings.ApplyTheme();
-        _services.Startup.SetEnabled(Settings.StartWithWindows);
+        CurrentSettings = await _services.SettingsStore.LoadAsync().ConfigureAwait(true);
+        CurrentSettings.ApplyTheme();
+        _services.Startup.SetEnabled(CurrentSettings.StartWithWindows);
         await Presets.ReloadAsync().ConfigureAwait(true);
         _services.Tray.Initialize();
         await SyncTrayAsync().ConfigureAwait(true);
