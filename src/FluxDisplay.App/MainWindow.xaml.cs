@@ -29,7 +29,7 @@ public sealed partial class MainWindow : Window
     {
         await ViewModel.InitializeAsync().ConfigureAwait(true);
         Navigate("presets");
-        if (ViewModel.SettingsViewModel.StartMinimized)
+        if (ViewModel.CurrentSettings.StartMinimized)
         {
             HideToTray();
         }

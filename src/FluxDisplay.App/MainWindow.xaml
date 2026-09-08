@@ -34,6 +34,6 @@
             x:Name="TrayIcon"
             ToolTipText="flux-display"
             IconSource="ms-appx:///Assets/tray.ico"
-            Visibility="Collapsed" />
+            Visibility="Visible" />
     </Grid>
 </Window>
