@@ -5,6 +5,8 @@ obj/
 *.user
 *.suo
 TestResults/
+.repowise/
+.claude/
 
 # Rider / tooling
 .idea/

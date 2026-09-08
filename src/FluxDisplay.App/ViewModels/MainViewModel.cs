@@ -39,7 +39,6 @@ public sealed partial class MainViewModel : ObservableObject
         await SyncTrayAsync().ConfigureAwait(true);
 
         _services.Tray.OpenRequested += (_, _) => RequestShowWindow?.Invoke(this, EventArgs.Empty);
-        _services.Tray.SettingsRequested += (_, _) => Navigate("settings");
         _services.Tray.PresetApplyRequested += async (_, id) => await Presets.ApplyByIdAsync(id).ConfigureAwait(true);
         Presets.PresetsChanged += async (_, _) => await SyncTrayAsync().ConfigureAwait(true);
         Create.PresetCreated += async (_, preset) =>

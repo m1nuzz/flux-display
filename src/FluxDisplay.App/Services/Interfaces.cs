@@ -36,7 +36,6 @@ public interface ITrayService : IDisposable
     void UpdatePresets(IReadOnlyList<Preset> presets, Guid? activePresetId);
     void ShowNotification(string title, string message);
     event EventHandler? OpenRequested;
-    event EventHandler? SettingsRequested;
     event EventHandler<Guid>? PresetApplyRequested;
 }
 

@@ -19,7 +19,6 @@ public sealed class TrayService : ITrayService
     private Guid? _activePresetId;
 
     public event EventHandler? OpenRequested;
-    public event EventHandler? SettingsRequested;
     public event EventHandler<Guid>? PresetApplyRequested;
 
     public void Initialize()
@@ -132,8 +131,9 @@ public sealed class TrayService : ITrayService
 
         var header = new MenuFlyoutItem
         {
-            Text = "flux-display",
-            IsEnabled = false
+            Text = "Display Presets",
+            IsEnabled = false,
+            Icon = new FontIcon { Glyph = "\uE7F4" }
         };
         flyout.Items.Add(header);
         flyout.Items.Add(new MenuFlyoutSeparator());
@@ -142,11 +142,12 @@ public sealed class TrayService : ITrayService
         {
             foreach (var preset in _presets.Take(10))
             {
-                var isActive = _activePresetId.HasValue && _activePresetId.Value == preset.Id;
+                var subtitle = $"{preset.FriendlyMonitorName} \u00B7 {preset.Mode.RefreshRate} Hz";
                 var item = new MenuFlyoutItem
                 {
-                    Text = isActive ? $"● {preset.Name}" : preset.Name,
-                    Tag = preset.Id
+                    Text = $"{preset.Name} — {subtitle}",
+                    Tag = preset.Id,
+                    Icon = new FontIcon { Glyph = "\uE7F4" }
                 };
                 item.Click += (_, _) =>
                 {
@@ -166,7 +167,7 @@ public sealed class TrayService : ITrayService
             flyout.Items.Add(new MenuFlyoutSeparator());
         }
 
-        var open = new MenuFlyoutItem { Text = "Open" };
+        var open = new MenuFlyoutItem { Text = "Open Display Presets", Icon = new FontIcon { Glyph = "\uE713" } };
         open.Click += (_, _) =>
         {
             OpenRequested?.Invoke(this, EventArgs.Empty);
@@ -181,13 +182,7 @@ public sealed class TrayService : ITrayService
         };
         flyout.Items.Add(open);
 
-        var settings = new MenuFlyoutItem { Text = "Settings" };
-        settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
-        flyout.Items.Add(settings);
-
-        flyout.Items.Add(new MenuFlyoutSeparator());
-
-        var exit = new MenuFlyoutItem { Text = "Exit" };
+        var exit = new MenuFlyoutItem { Text = "Exit", Icon = new FontIcon { Glyph = "\uE7E8" } };
         exit.Click += (_, _) => Application.Current.Exit();
         flyout.Items.Add(exit);
 
