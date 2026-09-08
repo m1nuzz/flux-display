@@ -1,5 +1,6 @@
-namespace FluxDisplay.Core.Models;
+namespace FluxDisplay.App.Models;
 
+// Theme preference for the application.
 public enum AppTheme
 {
     System,

@@ -1,19 +1,45 @@
 # FluxDisplay
 
-FluxDisplay is a Windows 11 utility for saving monitor display presets and applying them from a desktop window or the system tray.
+Native Windows 11 utility for saving and restoring monitor display presets (resolution, refresh rate, color depth, scale) from a desktop window or system tray. Presets are stored as JSON under `%LOCALAPPDATA%\FluxDisplay\presets.json` and applied via `ChangeDisplaySettingsEx`.
 
-## Development status
+## Build and run
 
-The platform-neutral Core library and its unit tests are implemented first. The WinUI 3 application targets Windows and is developed separately because WinUI 3 and Windows SDK components are not available on Linux CI runners.
+Prerequisites: .NET 8 SDK, Windows 11 SDK (22621) for the WinUI app. Core library builds on any platform.
 
-## Test locally
-
-```bash
-export PATH="$HOME/.dotnet:$PATH"
+```powershell
 dotnet restore
- dotnet test --configuration Release --no-restore
+dotnet build -c Release
+dotnet test
+dotnet publish -p:Platform=x64 -p:WindowsPackageType=None
+msbuild /p:GenerateAppxPackageOnBuild=true
 ```
 
-## GitHub checks
+Common variants:
 
-Every push and pull request runs the Core unit tests and a smoke check that verifies the solution contains the required Core and test projects.
+```powershell
+dotnet restore
+dotnet build FluxDisplay.sln -c Release -p:Platform=x64
+dotnet test tests/FluxDisplay.Core.Tests/FluxDisplay.Core.Tests.csproj -c Release
+dotnet publish src/FluxDisplay.App/FluxDisplay.App.csproj -c Release -p:Platform=x64 -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true
+msbuild FluxDisplay.sln /p:Configuration=Release /p:Platform=x64 /p:GenerateAppxPackageOnBuild=true /p:AppxBundle=Never /p:AppxPackageDir="artifacts/Packages/"
+```
+
+Linux smoke (Core only):
+
+```bash
+dotnet test --configuration Release
+```
+
+## Project structure
+
+- `src/FluxDisplay.Core` — platform-neutral models (`DisplayInfo`, `Rect`, `DisplayMode`, `DISP_CHANGE`, `Preset`, `AppSettings`), `PresetValidator`, `PresetJsonRepository`
+- `src/FluxDisplay.App` — WinUI 3 app (Mica backdrop, tray, `DisplayService`, `PresetApplier`, Views/ViewModels)
+- `tests/FluxDisplay.Core.Tests` — xUnit + coverlet for Core
+
+## Tech stack
+
+C# 12, .NET 8.0, Windows App SDK 1.6.250205002, `net8.0-windows10.0.22621.0` (`x64` + `arm64`), unpackaged + single-project MSIX, Trim/AOT disabled.
+
+## License
+
+MIT

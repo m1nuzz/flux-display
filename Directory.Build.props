@@ -4,5 +4,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <WarningsNotAsErrors>NU1603;CS0576;CS0219;CS0612;CS0618</WarningsNotAsErrors>
+    <NoWarn>$(NoWarn);NU1603;CS0576;CS0219;CS0612;CS0618</NoWarn>
   </PropertyGroup>
 </Project>

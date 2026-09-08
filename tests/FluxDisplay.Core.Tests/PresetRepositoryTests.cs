@@ -4,6 +4,7 @@ using Xunit;
 
 namespace FluxDisplay.Core.Tests;
 
+// Verifies PresetJsonRepository persistence: round-trip, missing file, and corrupt file handling.
 public sealed class PresetRepositoryTests
 {
     [Fact]

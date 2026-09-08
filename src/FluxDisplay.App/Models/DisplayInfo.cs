@@ -1,15 +1,9 @@
-namespace FluxDisplay.Core.Models;
+namespace FluxDisplay.App.Models;
 
 // Screen bounds in pixels. X/Y is the origin on the virtual desktop.
 public readonly record struct Rect(int X, int Y, int Width, int Height);
 
-// Backward-compatible alias for code that still references DisplayRect.
-public readonly record struct DisplayRect(int X, int Y, int Width, int Height)
-{
-    public static implicit operator Rect(DisplayRect r) => new(r.X, r.Y, r.Width, r.Height);
-    public static implicit operator DisplayRect(Rect r) => new(r.X, r.Y, r.Width, r.Height);
-}
-
+// Represents a connected display with current mode, DPI and scale.
 public sealed class DisplayInfo
 {
     public required string DevicePath { get; init; }

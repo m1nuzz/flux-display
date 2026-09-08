@@ -1,9 +1,9 @@
-namespace FluxDisplay.Core.Models;
+namespace FluxDisplay.App.Models;
 
 // Win32-compatible result of ChangeDisplaySettingsEx. Values match the native DISP_CHANGE constants.
 public enum DISP_CHANGE : int
 {
-    Successful = 0,
+    Success = 0,
     Restart = 1,
     Failed = -1,
     BadMode = -2,
@@ -13,6 +13,7 @@ public enum DISP_CHANGE : int
     BadDualView = -6
 }
 
+// Represents a single display mode entry with resolution, refresh and color depth.
 public sealed record DisplayMode
 {
     public required int Width { get; init; }

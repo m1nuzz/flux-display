@@ -3,26 +3,40 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.22621.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <RootNamespace>FluxDisplay.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x64;arm64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishAot>false</PublishAot>
     <EnableDefaultApplicationDefinition>True</EnableDefaultApplicationDefinition>
     <EnableDefaultCompileItems>True</EnableDefaultCompileItems>
     <UseRidGraph>true</UseRidGraph>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12.0</LangVersion>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
     <PublishProfile>Properties\PublishProfiles\win10-$(Platform).pubxml</PublishProfile>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <WarningsNotAsErrors>NU1603;CS0576;CS0219</WarningsNotAsErrors>
+    <NoWarn>$(NoWarn);NU1603;CS0576;CS0219</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250205002" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="CommunityToolkit.WinUI.Extensions" Version="8.2.250402" />
     <PackageReference Include="H.NotifyIcon.WinUI" Version="2.3.0" />
+    <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.106-beta" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="NativeMethods.json" CopyToOutputDirectory="Never" />
+    <AdditionalFiles Include="Native\NativeMethods.json" CopyToOutputDirectory="Never" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\StoreLogo.png" />
@@ -31,6 +45,6 @@
     <Content Include="Assets\Wide310x150Logo.png" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../FluxDisplay.Core/FluxDisplay.Core.csproj" />
+    <ProjectReference Include="..\FluxDisplay.Core\FluxDisplay.Core.csproj" />
   </ItemGroup>
 </Project>

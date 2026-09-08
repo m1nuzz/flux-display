@@ -8,12 +8,23 @@ TestResults/
 
 # Rider / tooling
 .idea/
+.vscode/
 
 # Generated Windows App SDK files
 Generated Files/
 AppPackages/
 BundleArtifacts/
+artifacts/
+publish/
 
 # Local environment
 .env
 *.userprefs
+*.pfx
+*.cer
+
+# MSIX
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle

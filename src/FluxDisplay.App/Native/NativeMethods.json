@@ -1,0 +1,23 @@
+﻿{
+  "$schema": "https://aka.ms/CsWin32.schema.json",
+  "allowMarshaling": true,
+  "emitSingleFile": false,
+  "public": false,
+  "className": "Windows",
+  "namespace": "FluxDisplay.App.Native",
+  "comInterop": {
+    "useIntPtr": false
+  },
+  "methods": [
+    "EnumDisplayDevicesW",
+    "EnumDisplaySettingsExW",
+    "EnumDisplayMonitors",
+    "ChangeDisplaySettingsExW",
+    "GetMonitorInfoW",
+    "MonitorFromPoint",
+    "GetDpiForMonitor",
+    "Shell_NotifyIconW",
+    "SetProcessWorkingSetSize",
+    "GetCurrentProcess"
+  ]
+}

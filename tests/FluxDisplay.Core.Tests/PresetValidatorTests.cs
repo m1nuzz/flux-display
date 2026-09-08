@@ -4,6 +4,7 @@ using FluxDisplay.Core.Services;
 
 namespace FluxDisplay.Core.Tests;
 
+// Validates PresetValidator rules: required fields, scale bounds, display mode constraints.
 public sealed class PresetValidatorTests
 {
     private static Preset CreateValidPreset() => new()
