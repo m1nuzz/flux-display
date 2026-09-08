@@ -80,6 +80,10 @@ public sealed partial class MainWindow : Window
     private void Navigate(string tag)
     {
         ViewModel.SelectedTag = tag;
+        if (tag == "create")
+        {
+            _ = ViewModel.Create.ResetAsync();
+        }
         ContentFrame.Content = tag switch
         {
             "settings" => new SettingsPage { DataContext = ViewModel.SettingsViewModel },

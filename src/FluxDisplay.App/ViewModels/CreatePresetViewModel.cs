@@ -88,10 +88,16 @@ public sealed partial class CreatePresetViewModel : ObservableObject
         {
             Monitors.Clear();
             var displays = await _services.Display.GetDisplaysAsync().ConfigureAwait(true);
+            System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "flux-ui.log"), $"LoadMonitorsAsync displays={displays.Count} at {DateTime.Now:O}\n");
             foreach (var display in displays)
             {
                 Monitors.Add(MonitorOption.FromDisplayInfo(display));
             }
+            System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "flux-ui.log"), $"Monitors added {Monitors.Count}\n");
+        }
+        catch (Exception ex)
+        {
+            System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "flux-ui.log"), $"LoadMonitors error {ex}\n");
         }
         finally
         {
