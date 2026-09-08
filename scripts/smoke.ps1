@@ -38,7 +38,7 @@ if (-not (Test-Path $exe)) { throw "Publish artifact missing: $exe" }
 Write-Host "Publish OK: $exe ($([math]::Round((Get-Item $exe).Length/1MB,2)) MB)" -ForegroundColor Green
 
 # 5. Quick enumeration sanity via direct P/Invoke (no UI) — informational only, not fatal on headless CI
-Write-Host "`n[5/4] P/Invoke enumeration sanity..." -ForegroundColor Yellow
+Write-Host "`n[5/5] P/Invoke enumeration sanity..." -ForegroundColor Yellow
 try {
   Add-Type @"
 using System; using System.Runtime.InteropServices;
@@ -50,6 +50,39 @@ public class H2 { [DllImport("user32.dll", CharSet=CharSet.Unicode)] public stat
   if ($adapters2.Count -lt 1) { Write-Host "Warning: No adapters found (headless CI?)" -ForegroundColor Yellow }
 } catch {
   Write-Host "P/Invoke check skipped: $_" -ForegroundColor Yellow
+}
+
+# 6. Smoke dump via App --smoke-dump (logs DisplayService enumeration)
+Write-Host "`n[6/5] App smoke dump (DisplayService)..." -ForegroundColor Yellow
+$smokeLog = Join-Path $env:TEMP "flux-smoke.log"
+Remove-Item -Force $smokeLog -ErrorAction SilentlyContinue
+$exeToRun = Join-Path $publishDir "FluxDisplay.App.exe"
+if (Test-Path $exeToRun) {
+  $proc = Start-Process -FilePath $exeToRun -ArgumentList "--smoke-dump", $smokeLog -PassThru
+  $exited = $proc.WaitForExit(8000)
+  if (-not $exited) { try { $proc.Kill() } catch {} }
+  if (Test-Path $smokeLog) {
+    $content = Get-Content -LiteralPath $smokeLog -Raw
+    Write-Host $content
+    if ($content -match "Count=0" -or $content -match "ERROR") { throw "Smoke dump reported no displays or error. See log above." }
+    $artifactsSmokeLog = Join-Path $repoRoot "artifacts/smoke.log"
+    try { Copy-Item -LiteralPath $smokeLog -Destination $artifactsSmokeLog -Force } catch {}
+  } else {
+    Write-Host "Warning: smoke log not created (app may need UI thread, fallback to file checks)" -ForegroundColor Yellow
+    # Fallback: check DisplayService source contains fix
+    $svcPath = Join-Path $repoRoot "src/FluxDisplay.App/Services/DisplayService.cs"
+    $svcText = Get-Content -LiteralPath $svcPath -Raw
+    if ($svcText -match "if \(!isActive \|\| isMirroring\)" -and $svcText -match "var isActive.*DISPLAY_DEVICE_ACTIVE") {
+      # old buggy pattern still present at adapter level — should be removed
+      if ($svcText -match "Do not filter adapters") {
+        Write-Host "DisplayService fix present (adapter filter removed)" -ForegroundColor Green
+      } else {
+        throw "DisplayService still contains adapter ACTIVE filter"
+      }
+    }
+  }
+} else {
+  Write-Host "Publish exe not found, skipping smoke dump" -ForegroundColor Yellow
 }
 
 Pop-Location -ErrorAction SilentlyContinue

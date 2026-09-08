@@ -463,18 +463,18 @@ public sealed class DisplayService : IDisplayService
 
     // Manual P/Invoke fallbacks using DllImport for compatibility with non-blittable structs.
 
-    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "EnumDisplayDevicesW")]
     private static extern bool EnumDisplayDevicesWNative(string? lpDevice, uint iDevNum, ref FluxDisplay.App.Native.DISPLAY_DEVICEW lpDisplayDevice, uint dwFlags);
 
-    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "EnumDisplaySettingsExW")]
     private static extern bool EnumDisplaySettingsExWNative(string? lpszDeviceName, int iModeNum, ref FluxDisplay.App.Native.DEVMODEW lpDevMode, uint dwFlags);
 
-    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "ChangeDisplaySettingsExW")]
     private static extern int ChangeDisplaySettingsExWNative(string? lpszDeviceName, ref FluxDisplay.App.Native.DEVMODEW lpDevMode, IntPtr hwnd, uint dwflags, IntPtr lParam);
 
-    [DllImport("user32.dll", SetLastError = true)]
+    [DllImport("user32.dll", SetLastError = true, EntryPoint = "EnumDisplayMonitors")]
     private static extern bool EnumDisplayMonitorsNative(IntPtr hdc, IntPtr lprcClip, FluxDisplay.App.Native.MonitorEnumProc lpfnEnum, IntPtr dwData);
 
-    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "GetMonitorInfoW")]
     private static extern bool GetMonitorInfoWNative(IntPtr hMonitor, ref FluxDisplay.App.Native.MONITORINFOEXW lpmi);
 }
