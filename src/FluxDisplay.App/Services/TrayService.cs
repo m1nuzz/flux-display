@@ -130,31 +130,31 @@ public sealed class TrayService : ITrayService
 
         var flyout = new MenuFlyout();
 
-        // Force dark theme for tray menu to match reference (navy #081827, rounded)
-        // MenuFlyout itself has no RequestedTheme, so style its presenter to Dark.
-        // Also fix width: reference is ~260px, default is too narrow and clips "Display Presets"/"Open Display Presets"
+        // Force dark theme for tray menu to match reference (navy #081827, rounded).
+        // NOTE: keep presenter style minimal (theme + background only) — replacing the
+        // full default style breaks layout. Width is enforced per-item below (flyout
+        // sizes to its widest item), which reliably fixes "Displa"/"No pr" clipping.
         try
         {
             var presenterStyle = new Style(typeof(MenuFlyoutPresenter));
             presenterStyle.Setters.Add(new Setter(FrameworkElement.RequestedThemeProperty, ElementTheme.Dark));
-            presenterStyle.Setters.Add(new Setter(FrameworkElement.MinWidthProperty, 260.0));
-            presenterStyle.Setters.Add(new Setter(FrameworkElement.MaxWidthProperty, 320.0));
-            presenterStyle.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 100.0));
             presenterStyle.Setters.Add(new Setter(Control.BackgroundProperty, new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x08, 0x18, 0x27))));
             presenterStyle.Setters.Add(new Setter(Control.CornerRadiusProperty, new CornerRadius(12)));
             presenterStyle.Setters.Add(new Setter(Control.BorderBrushProperty, new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x1E, 0x3A, 0x5F))));
             presenterStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
-            presenterStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 8, 8, 8)));
             flyout.MenuFlyoutPresenterStyle = presenterStyle;
         }
         catch
         {
         }
 
+        const double MenuItemMinWidth = 250.0;
+
         var header = new MenuFlyoutItem
         {
             Text = "Display Presets",
             IsEnabled = false,
+            MinWidth = MenuItemMinWidth,
             Icon = new FontIcon
             {
                 Glyph = "\uE7F4",
@@ -173,6 +173,7 @@ public sealed class TrayService : ITrayService
                 {
                     Text = $"{preset.Name} — {subtitle}",
                     Tag = preset.Id,
+                    MinWidth = MenuItemMinWidth,
                     Icon = new FontIcon
                     {
                         Glyph = "\uE7F4",
@@ -192,7 +193,7 @@ public sealed class TrayService : ITrayService
         }
         else
         {
-            var empty = new MenuFlyoutItem { Text = "No presets", IsEnabled = false };
+            var empty = new MenuFlyoutItem { Text = "No presets", IsEnabled = false, MinWidth = MenuItemMinWidth };
             flyout.Items.Add(empty);
             flyout.Items.Add(new MenuFlyoutSeparator());
         }
@@ -200,6 +201,7 @@ public sealed class TrayService : ITrayService
         var open = new MenuFlyoutItem
         {
             Text = "Open Display Presets",
+            MinWidth = MenuItemMinWidth,
             Icon = new FontIcon
             {
                 Glyph = "\uE713",
@@ -223,6 +225,7 @@ public sealed class TrayService : ITrayService
         var exit = new MenuFlyoutItem
         {
             Text = "Exit",
+            MinWidth = MenuItemMinWidth,
             Icon = new FontIcon
             {
                 Glyph = "\uE7E8",
@@ -237,9 +240,11 @@ public sealed class TrayService : ITrayService
 
     private static Uri TryGetTrayIconUri()
     {
+        // NOTE: BitmapImage cannot reliably decode .ico — use PNG for the tray.
+        // tray.png is a 32px monitor drawn for small sizes (thick borders).
         try
         {
-            return new Uri("ms-appx:///Assets/tray.ico");
+            return new Uri("ms-appx:///Assets/tray.png");
         }
         catch
         {

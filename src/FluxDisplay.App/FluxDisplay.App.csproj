@@ -45,6 +45,7 @@
       <Content Include="Assets\Wide310x150Logo.png" />
       <Content Include="Assets\app.ico" />
       <Content Include="Assets\tray.ico" />
+      <Content Include="Assets\tray.png" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FluxDisplay.Core\FluxDisplay.Core.csproj" />
