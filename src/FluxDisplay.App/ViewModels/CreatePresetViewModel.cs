@@ -103,10 +103,13 @@ public sealed partial class CreatePresetViewModel : ObservableObject
             Monitors.Clear();
             var displays = await _services.Display.GetDisplaysAsync().ConfigureAwait(true);
             Helpers.AppLog.Info($"LoadMonitorsAsync got {displays.Count} displays");
+            var number = 1;
             foreach (var display in displays)
             {
-                Monitors.Add(MonitorOption.FromDisplayInfo(display));
-                Helpers.AppLog.Info($"LoadMonitorsAsync added {display.DisplayName}");
+                var option = MonitorOption.FromDisplayInfo(display);
+                option.DisplayNumber = number++;
+                Monitors.Add(option);
+                Helpers.AppLog.Info($"LoadMonitorsAsync added #{option.DisplayNumber} {display.DisplayName}");
             }
         }
         finally

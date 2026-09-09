@@ -17,7 +17,10 @@ public sealed partial class MonitorOption : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
-    public string DisplayTitle => IsPrimary ? $"{FriendlyName} (Primary)" : FriendlyName;
+    // 1-based number in enumeration order — matches the Identify overlay numbers.
+    public int DisplayNumber { get; set; } = 1;
+
+    public string DisplayTitle => $"{DisplayNumber} · {(IsPrimary ? $"{FriendlyName} (Primary)" : FriendlyName)}";
     public string ResolutionText => $"{CurrentMode.Width} × {CurrentMode.Height} @ {CurrentMode.RefreshRate} Hz";
     public string ScaleText => $"{ScalePercent}% · {CurrentDpi} DPI";
 
