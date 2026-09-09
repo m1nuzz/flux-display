@@ -276,7 +276,7 @@ public sealed class TrayService : ITrayService
             if (i < presets.Count)
             {
                 var preset = presets[i];
-                slot.Text = $"{preset.Name} — {preset.FriendlyMonitorName} \u00B7 {preset.Mode.RefreshRate} Hz";
+                slot.Text = FormatMenuText(preset);
                 slot.Tag = preset.Id;
                 slot.Visibility = Visibility.Visible;
             }
@@ -292,6 +292,21 @@ public sealed class TrayService : ITrayService
         }
 
         Helpers.AppLog.Info($"TrayService menu refreshed presets={presets.Count}");
+    }
+
+    // Auto-generated names already contain monitor + mode
+    // ("Generic PnP Monitor 3840 × 2160 240Hz") — appending the subtitle would
+    // duplicate it. Short custom names ("Gaming") still get the subtitle.
+    private static string FormatMenuText(Preset preset)
+    {
+        var subtitle = $"{preset.FriendlyMonitorName} \u00B7 {preset.Mode.RefreshRate} Hz";
+        if (preset.Name.Contains(preset.FriendlyMonitorName, StringComparison.OrdinalIgnoreCase)
+            && preset.Name.Contains(preset.Mode.RefreshRate.ToString(), StringComparison.Ordinal))
+        {
+            return preset.Name;
+        }
+
+        return $"{preset.Name} — {subtitle}";
     }
 
     private Microsoft.UI.Xaml.Media.ImageSource? TryCreateLooseFileIcon()
