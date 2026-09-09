@@ -28,12 +28,15 @@ public sealed class TrayService : ITrayService
             return;
         }
 
-        var iconUri = TryGetTrayIconUri();
+        // Load tray icon from embedded resource: this app is unpackaged (no package
+        // identity), so ms-appx:/// URIs do not resolve at runtime and the tray
+        // slot renders transparent. Embedded bytes + SetSource always works.
+        var iconSource = TryLoadEmbeddedTrayIcon() ?? new BitmapImage(TryGetTrayIconUri());
 
         _taskbarIcon = new TaskbarIcon
         {
             ToolTipText = "flux-display",
-            IconSource = new BitmapImage(iconUri),
+            IconSource = iconSource,
             // SecondWindow renders XAML MenuFlyout (themeable dark) instead of Win32 white PopupMenu
             ContextMenuMode = ContextMenuMode.SecondWindow
         };
@@ -236,6 +239,55 @@ public sealed class TrayService : ITrayService
         flyout.Items.Add(exit);
 
         _taskbarIcon.ContextFlyout = flyout;
+    }
+
+    private Microsoft.UI.Xaml.Media.ImageSource? TryLoadEmbeddedTrayIcon()
+    {
+        try
+        {
+            var asm = typeof(TrayService).Assembly;
+            var names = asm.GetManifestResourceNames();
+            LogTray($"resources: {string.Join(",", names)}");
+            var match = names.FirstOrDefault(n => n.EndsWith("tray.png", StringComparison.OrdinalIgnoreCase));
+            if (match is null)
+            {
+                LogTray("tray.png not embedded");
+                return null;
+            }
+
+            using var src = asm.GetManifestResourceStream(match);
+            if (src is null)
+            {
+                LogTray("open stream failed");
+                return null;
+            }
+
+            using var mem = new MemoryStream();
+            src.CopyTo(mem);
+            mem.Position = 0;
+            var bmp = new BitmapImage();
+            bmp.SetSource(mem.AsRandomAccessStream());
+            LogTray($"loaded {match} PixelWidth={bmp.PixelWidth} PixelHeight={bmp.PixelHeight}");
+            return bmp.PixelWidth > 0 ? bmp : null;
+        }
+        catch (Exception ex)
+        {
+            LogTray("load failed: " + ex.Message);
+            return null;
+        }
+    }
+
+    private static void LogTray(string message)
+    {
+        try
+        {
+            File.AppendAllText(
+                Path.Combine(Path.GetTempPath(), "flux-tray.log"),
+                $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
+        }
+        catch
+        {
+        }
     }
 
     private static Uri TryGetTrayIconUri()

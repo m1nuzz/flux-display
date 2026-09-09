@@ -45,7 +45,10 @@
       <Content Include="Assets\Wide310x150Logo.png" />
       <Content Include="Assets\app.ico" />
       <Content Include="Assets\tray.ico" />
-      <Content Include="Assets\tray.png" />
+      <!-- Embedded, not Content: unpackaged app has no package identity, so
+           ms-appx:/// cannot resolve at runtime. TrayService loads this via
+           GetManifestResourceStream, which always works. -->
+      <EmbeddedResource Include="Assets\tray.png" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FluxDisplay.Core\FluxDisplay.Core.csproj" />
