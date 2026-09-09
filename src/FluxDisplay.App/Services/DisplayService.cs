@@ -327,7 +327,7 @@ public sealed class DisplayService : IDisplayService
 
     private const int MDT_EFFECTIVE_DPI = 0;
 
-    [DllImport("shcore.dll", SetLastError = true)]
+    [DllImport("shcore.dll", SetLastError = true, EntryPoint = "GetDpiForMonitor")]
     private static extern int GetDpiForMonitorNative(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
 
     private static int TryGetDpi(string displayName)
@@ -339,17 +339,27 @@ public sealed class DisplayService : IDisplayService
             uint found = 0;
             FluxDisplay.App.Native.MonitorEnumProc callback = (IntPtr hMonitor, IntPtr hdcMonitor, ref FluxDisplay.App.Native.RECT lprcMonitor, IntPtr dwData) =>
             {
-                var info = new FluxDisplay.App.Native.MONITORINFOEXW();
-                info.cbSize = (uint)Marshal.SizeOf<FluxDisplay.App.Native.MONITORINFOEXW>();
-                if (GetMonitorInfoWNative(hMonitor, ref info)
-                    && string.Equals(info.szDevice, displayName, StringComparison.OrdinalIgnoreCase))
+                // Never let exceptions escape a native-invoked callback: the CLR
+                // cannot unwind through the native EnumDisplayMonitors frame and
+                // the process dies with no managed handler firing.
+                try
                 {
-                    if (GetDpiForMonitorNative(hMonitor, MDT_EFFECTIVE_DPI, out var dx, out _) == 0 && dx > 0)
+                    var info = new FluxDisplay.App.Native.MONITORINFOEXW();
+                    info.cbSize = (uint)Marshal.SizeOf<FluxDisplay.App.Native.MONITORINFOEXW>();
+                    if (GetMonitorInfoWNative(hMonitor, ref info)
+                        && string.Equals(info.szDevice, displayName, StringComparison.OrdinalIgnoreCase))
                     {
-                        found = dx;
-                    }
+                        if (GetDpiForMonitorNative(hMonitor, MDT_EFFECTIVE_DPI, out var dx, out _) == 0 && dx > 0)
+                        {
+                            found = dx;
+                        }
 
-                    return false;
+                        return false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Helpers.AppLog.Error(ex, "TryGetDpi.callback");
                 }
 
                 return true;
