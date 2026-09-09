@@ -28,10 +28,13 @@ public sealed class TrayService : ITrayService
             return;
         }
 
-        // Load tray icon from embedded resource: this app is unpackaged (no package
-        // identity), so ms-appx:/// URIs do not resolve at runtime and the tray
-        // slot renders transparent. Embedded bytes + SetSource always works.
-        var iconSource = TryLoadEmbeddedTrayIcon() ?? new BitmapImage(TryGetTrayIconUri());
+        // H.NotifyIcon converts IconSource via BitmapImage.UriSource -> loose file
+        // read. ms-appx:/// never resolves unpackaged (no package identity) and
+        // a stream-loaded BitmapImage has UriSource == null, so both render
+        // transparent. Only a file:// URI to a real .ico works.
+        var iconSource = TryCreateLooseFileIcon()
+            ?? TryCreateTempFileIcon()
+            ?? new BitmapImage(TryGetTrayIconUri());
 
         _taskbarIcon = new TaskbarIcon
         {
@@ -241,38 +244,62 @@ public sealed class TrayService : ITrayService
         _taskbarIcon.ContextFlyout = flyout;
     }
 
-    private Microsoft.UI.Xaml.Media.ImageSource? TryLoadEmbeddedTrayIcon()
+    private Microsoft.UI.Xaml.Media.ImageSource? TryCreateLooseFileIcon()
+    {
+        try
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "Assets", "tray.ico");
+            if (!File.Exists(path))
+            {
+                LogTray("loose tray.ico missing: " + path);
+                return null;
+            }
+
+            LogTray("using loose file: " + path);
+            return new BitmapImage(new Uri(path));
+        }
+        catch (Exception ex)
+        {
+            LogTray("loose file failed: " + ex.Message);
+            return null;
+        }
+    }
+
+    private Microsoft.UI.Xaml.Media.ImageSource? TryCreateTempFileIcon()
     {
         try
         {
             var asm = typeof(TrayService).Assembly;
-            var names = asm.GetManifestResourceNames();
-            LogTray($"resources: {string.Join(",", names)}");
-            var match = names.FirstOrDefault(n => n.EndsWith("tray.png", StringComparison.OrdinalIgnoreCase));
+            var match = asm.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith("tray.png", StringComparison.OrdinalIgnoreCase));
             if (match is null)
             {
                 LogTray("tray.png not embedded");
                 return null;
             }
 
-            using var src = asm.GetManifestResourceStream(match);
-            if (src is null)
+            var dir = Path.Combine(Path.GetTempPath(), "FluxDisplay");
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, "tray.png");
+            if (!File.Exists(path))
             {
-                LogTray("open stream failed");
-                return null;
+                using var src = asm.GetManifestResourceStream(match);
+                if (src is null)
+                {
+                    LogTray("open stream failed");
+                    return null;
+                }
+
+                using var dst = File.Create(path);
+                src.CopyTo(dst);
             }
 
-            using var mem = new MemoryStream();
-            src.CopyTo(mem);
-            mem.Position = 0;
-            var bmp = new BitmapImage();
-            bmp.SetSource(mem.AsRandomAccessStream());
-            LogTray($"loaded {match} PixelWidth={bmp.PixelWidth} PixelHeight={bmp.PixelHeight}");
-            return bmp.PixelWidth > 0 ? bmp : null;
+            LogTray("using temp file: " + path);
+            return new BitmapImage(new Uri(path));
         }
         catch (Exception ex)
         {
-            LogTray("load failed: " + ex.Message);
+            LogTray("temp file failed: " + ex.Message);
             return null;
         }
     }

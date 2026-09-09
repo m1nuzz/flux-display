@@ -44,10 +44,12 @@
       <Content Include="Assets\Square150x150Logo.png" />
       <Content Include="Assets\Wide310x150Logo.png" />
       <Content Include="Assets\app.ico" />
-      <Content Include="Assets\tray.ico" />
-      <!-- Embedded, not Content: unpackaged app has no package identity, so
-           ms-appx:/// cannot resolve at runtime. TrayService loads this via
-           GetManifestResourceStream, which always works. -->
+      <!-- CopyToPublishDirectory: publish output otherwise drops Assets entirely
+           (packed into resources.pri), but H.NotifyIcon resolves icons as loose
+           files under AppContext.BaseDirectory. -->
+      <Content Include="Assets\tray.ico" CopyToPublishDirectory="PreserveNewest" />
+      <!-- Fallback source: TrayService extracts this to %TEMP% when the loose
+           file is missing, so the tray icon works in any deployment layout. -->
       <EmbeddedResource Include="Assets\tray.png" />
   </ItemGroup>
   <ItemGroup>
