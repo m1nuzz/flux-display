@@ -118,16 +118,21 @@ public partial class App : Application
             return;
         }
 
-        var instance = AppInstance.FindOrRegisterForKey("flux-display-main");
-        if (!instance.IsCurrent)
+        var smokeUi = cmd.Any(a => a == "--smoke-ui");
+        if (!smokeUi)
         {
-            var redirectArgs = AppInstance.GetCurrent().GetActivatedEventArgs();
-            instance.RedirectActivationToAsync(redirectArgs).AsTask().GetAwaiter().GetResult();
-            Current.Exit();
-            return;
+            var instance = AppInstance.FindOrRegisterForKey("flux-display-main");
+            if (!instance.IsCurrent)
+            {
+                var redirectArgs = AppInstance.GetCurrent().GetActivatedEventArgs();
+                instance.RedirectActivationToAsync(redirectArgs).AsTask().GetAwaiter().GetResult();
+                Current.Exit();
+                return;
+            }
+
+            instance.Activated += OnRedirectedActivation;
         }
 
-        instance.Activated += OnRedirectedActivation;
         Services = AppServices.Initialize();
         var window = new MainWindow();
         MainWindow = window;
@@ -137,6 +142,19 @@ public partial class App : Application
         AsyncHelper.FireAndForget(async () =>
         {
             await window.InitializeAsync().ConfigureAwait(true);
+            if (smokeUi)
+            {
+                var outDir = cmd.SkipWhile(a => a != "--smoke-ui").Skip(1).FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(outDir) || outDir.StartsWith('-'))
+                {
+                    outDir = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "ui-smoke");
+                }
+
+                await SmokeUiRunner.RunAsync(window, outDir).ConfigureAwait(true);
+                Current.Exit();
+                return;
+            }
+
             TrimWorkingSet();
         });
     }

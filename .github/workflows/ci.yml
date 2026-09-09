@@ -105,6 +105,17 @@ jobs:
             exit $exitCode
           }
 
+      - name: Upload UI smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FluxDisplay-ui-smoke
+          path: |
+            artifacts/ui-smoke/**
+            artifacts/smoke.log
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload XAML compiler diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4

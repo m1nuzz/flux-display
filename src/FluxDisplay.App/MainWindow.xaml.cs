@@ -77,6 +77,8 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    internal void NavigateTo(string tag) => Navigate(tag);
+
     private void Navigate(string tag)
     {
         Helpers.AppLog.Info($"MainWindow.Navigate tag={tag}");

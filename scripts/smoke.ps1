@@ -53,7 +53,7 @@ public class H2 { [DllImport("user32.dll", CharSet=CharSet.Unicode)] public stat
 }
 
 # 6. Smoke dump via App --smoke-dump (logs DisplayService enumeration)
-Write-Host "`n[6/5] App smoke dump (DisplayService)..." -ForegroundColor Yellow
+Write-Host "`n[6/7] App smoke dump (DisplayService)..." -ForegroundColor Yellow
 $smokeLog = Join-Path $env:TEMP "flux-smoke.log"
 Remove-Item -Force $smokeLog -ErrorAction SilentlyContinue
 $exeToRun = Join-Path $publishDir "FluxDisplay.App.exe"
@@ -69,11 +69,9 @@ if (Test-Path $exeToRun) {
     try { Copy-Item -LiteralPath $smokeLog -Destination $artifactsSmokeLog -Force } catch {}
   } else {
     Write-Host "Warning: smoke log not created (app may need UI thread, fallback to file checks)" -ForegroundColor Yellow
-    # Fallback: check DisplayService source contains fix
     $svcPath = Join-Path $repoRoot "src/FluxDisplay.App/Services/DisplayService.cs"
     $svcText = Get-Content -LiteralPath $svcPath -Raw
     if ($svcText -match "if \(!isActive \|\| isMirroring\)" -and $svcText -match "var isActive.*DISPLAY_DEVICE_ACTIVE") {
-      # old buggy pattern still present at adapter level — should be removed
       if ($svcText -match "Do not filter adapters") {
         Write-Host "DisplayService fix present (adapter filter removed)" -ForegroundColor Green
       } else {
@@ -83,6 +81,29 @@ if (Test-Path $exeToRun) {
   }
 } else {
   Write-Host "Publish exe not found, skipping smoke dump" -ForegroundColor Yellow
+}
+
+# 7. Capture UI screenshots of every screen for CI artifacts
+Write-Host "`n[7/7] App UI screenshots (--smoke-ui)..." -ForegroundColor Yellow
+$uiOut = Join-Path $repoRoot "artifacts/ui-smoke"
+New-Item -ItemType Directory -Force -Path $uiOut | Out-Null
+if (Test-Path $exeToRun) {
+  $uiProc = Start-Process -FilePath $exeToRun -ArgumentList "--smoke-ui", $uiOut -WorkingDirectory $repoRoot -PassThru
+  $uiExited = $uiProc.WaitForExit(45000)
+  if (-not $uiExited) {
+    Write-Host "Warning: --smoke-ui timed out, killing" -ForegroundColor Yellow
+    try { $uiProc.Kill() } catch {}
+  }
+  $pngs = @(Get-ChildItem -Path $uiOut -Filter *.png -ErrorAction SilentlyContinue)
+  Write-Host "UI smoke png count=$($pngs.Count) dir=$uiOut"
+  foreach ($png in $pngs) { Write-Host "  $($png.Name) $($png.Length)" }
+  $indexPath = Join-Path $uiOut "index.txt"
+  if (Test-Path $indexPath) { Get-Content -LiteralPath $indexPath | Write-Host }
+  if ($pngs.Count -lt 1) {
+    Write-Host "Warning: no UI screenshots captured (headless runner?)" -ForegroundColor Yellow
+  }
+} else {
+  Write-Host "Publish exe not found, skipping UI screenshots" -ForegroundColor Yellow
 }
 
 Pop-Location -ErrorAction SilentlyContinue

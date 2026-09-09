@@ -1,9 +1,12 @@
 #pragma warning disable CS0618, CS0219
+using FluxDisplay.App.Controls;
+using FluxDisplay.App.Helpers;
 using FluxDisplay.App.Models;
 using H.NotifyIcon;
 using H.NotifyIcon.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace FluxDisplay.App.Services;
@@ -17,6 +20,7 @@ public sealed class TrayService : ITrayService
     private TaskbarIcon? _taskbarIcon;
     private IReadOnlyList<Preset> _presets = Array.Empty<Preset>();
     private Guid? _activePresetId;
+    private Dictionary<string, int> _displayNumbers = new(StringComparer.OrdinalIgnoreCase);
 
     public event EventHandler? OpenRequested;
     public event EventHandler<Guid>? PresetApplyRequested;
@@ -62,24 +66,37 @@ public sealed class TrayService : ITrayService
     {
         _presets = presets ?? Array.Empty<Preset>();
         _activePresetId = activePresetId;
-        if (_taskbarIcon is not null)
+        if (_taskbarIcon is null)
         {
-            if (Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread() is not null)
-            {
-                RebuildMenu();
-            }
-            else
-            {
-                try
-                {
-                    App.MainWindow?.DispatcherQueue.TryEnqueue(RebuildMenu);
-                }
-                catch
-                {
-                    RebuildMenu();
-                }
-            }
+            return;
         }
+
+        AsyncHelper.FireAndForget(async () =>
+        {
+            await RefreshDisplayNumbersAsync().ConfigureAwait(false);
+            await AsyncHelper.EnqueueAsync(RebuildMenu).ConfigureAwait(false);
+        });
+    }
+
+    internal bool TryShowContextFlyout()
+    {
+        if (_taskbarIcon?.ContextFlyout is not MenuFlyout flyout)
+        {
+            return false;
+        }
+
+        var window = App.MainWindow;
+        if (window?.Content is not FrameworkElement root || root.XamlRoot is null)
+        {
+            return false;
+        }
+
+        flyout.ShowAt(root, new FlyoutShowOptions
+        {
+            Placement = FlyoutPlacementMode.Right,
+            ShowMode = FlyoutShowMode.Standard
+        });
+        return true;
     }
 
     public void ShowNotification(string title, string message)
@@ -139,7 +156,7 @@ public sealed class TrayService : ITrayService
     // stay visible. Never re-assign ContextFlyout, never touch Items after.
     private const int MaxMenuPresets = 10;
     private const double MenuItemMinWidth = 250.0;
-    private readonly List<MenuFlyoutItem> _presetSlots = new();
+    private readonly List<TrayPresetMenuItem> _presetSlots = new();
     private MenuFlyoutItem? _emptyItem;
 
     private void RebuildMenu()
@@ -200,7 +217,7 @@ public sealed class TrayService : ITrayService
 
         for (var i = 0; i < MaxMenuPresets; i++)
         {
-            var slot = new MenuFlyoutItem
+            var slot = new TrayPresetMenuItem
             {
                 MinWidth = MenuItemMinWidth,
                 Visibility = Visibility.Collapsed,
@@ -276,7 +293,8 @@ public sealed class TrayService : ITrayService
             if (i < presets.Count)
             {
                 var preset = presets[i];
-                slot.Text = FormatMenuText(preset);
+                slot.Text = preset.Name;
+                slot.Subtitle = FormatMenuSubtitle(preset);
                 slot.Tag = preset.Id;
                 slot.Visibility = Visibility.Visible;
             }
@@ -294,19 +312,42 @@ public sealed class TrayService : ITrayService
         Helpers.AppLog.Info($"TrayService menu refreshed presets={presets.Count}");
     }
 
-    // Auto-generated names already contain monitor + mode
-    // ("Generic PnP Monitor 3840 × 2160 240Hz") — appending the subtitle would
-    // duplicate it. Short custom names ("Gaming") still get the subtitle.
-    private static string FormatMenuText(Preset preset)
+    private string FormatMenuSubtitle(Preset preset)
     {
-        var subtitle = $"{preset.FriendlyMonitorName} \u00B7 {preset.Mode.RefreshRate} Hz";
-        if (preset.Name.Contains(preset.FriendlyMonitorName, StringComparison.OrdinalIgnoreCase)
-            && preset.Name.Contains(preset.Mode.RefreshRate.ToString(), StringComparison.Ordinal))
+        var number = ResolveMonitorNumber(preset);
+        return $"Monitor {number} \u00B7 {preset.Mode.RefreshRate} Hz";
+    }
+
+    private int ResolveMonitorNumber(Preset preset)
+    {
+        if (_displayNumbers.TryGetValue(preset.DevicePath, out var number))
         {
-            return preset.Name;
+            return number;
         }
 
-        return $"{preset.Name} — {subtitle}";
+        return 1;
+    }
+
+    private async Task RefreshDisplayNumbersAsync()
+    {
+        try
+        {
+            var displays = await App.Services.Display.GetDisplaysAsync().ConfigureAwait(false);
+            var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var number = 1;
+            foreach (var display in displays)
+            {
+                if (map.TryAdd(display.DevicePath, number))
+                {
+                    number++;
+                }
+            }
+
+            _displayNumbers = map;
+        }
+        catch
+        {
+        }
     }
 
     private Microsoft.UI.Xaml.Media.ImageSource? TryCreateLooseFileIcon()
