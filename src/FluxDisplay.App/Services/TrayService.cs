@@ -34,7 +34,8 @@ public sealed class TrayService : ITrayService
         {
             ToolTipText = "flux-display",
             IconSource = new BitmapImage(iconUri),
-            ContextMenuMode = ContextMenuMode.PopupMenu
+            // SecondWindow renders XAML MenuFlyout (themeable dark) instead of Win32 white PopupMenu
+            ContextMenuMode = ContextMenuMode.SecondWindow
         };
 
         // Use LeftClickCommand to handle TrayLeftMouseUp per spec (WinRT events disabled by default).
@@ -129,11 +130,36 @@ public sealed class TrayService : ITrayService
 
         var flyout = new MenuFlyout();
 
+        // Force dark theme for tray menu to match reference (navy #081827, rounded)
+        // MenuFlyout itself has no RequestedTheme, so style its presenter to Dark.
+        // Also fix width: reference is ~260px, default is too narrow and clips "Display Presets"/"Open Display Presets"
+        try
+        {
+            var presenterStyle = new Style(typeof(MenuFlyoutPresenter));
+            presenterStyle.Setters.Add(new Setter(FrameworkElement.RequestedThemeProperty, ElementTheme.Dark));
+            presenterStyle.Setters.Add(new Setter(FrameworkElement.MinWidthProperty, 260.0));
+            presenterStyle.Setters.Add(new Setter(FrameworkElement.MaxWidthProperty, 320.0));
+            presenterStyle.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 100.0));
+            presenterStyle.Setters.Add(new Setter(Control.BackgroundProperty, new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x08, 0x18, 0x27))));
+            presenterStyle.Setters.Add(new Setter(Control.CornerRadiusProperty, new CornerRadius(12)));
+            presenterStyle.Setters.Add(new Setter(Control.BorderBrushProperty, new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x1E, 0x3A, 0x5F))));
+            presenterStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+            presenterStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 8, 8, 8)));
+            flyout.MenuFlyoutPresenterStyle = presenterStyle;
+        }
+        catch
+        {
+        }
+
         var header = new MenuFlyoutItem
         {
             Text = "Display Presets",
             IsEnabled = false,
-            Icon = new FontIcon { Glyph = "\uE7F4" }
+            Icon = new FontIcon
+            {
+                Glyph = "\uE7F4",
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x3B, 0x82, 0xF6))
+            }
         };
         flyout.Items.Add(header);
         flyout.Items.Add(new MenuFlyoutSeparator());
@@ -147,7 +173,11 @@ public sealed class TrayService : ITrayService
                 {
                     Text = $"{preset.Name} — {subtitle}",
                     Tag = preset.Id,
-                    Icon = new FontIcon { Glyph = "\uE7F4" }
+                    Icon = new FontIcon
+                    {
+                        Glyph = "\uE7F4",
+                        Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xE6, 0xE6, 0xE6))
+                    }
                 };
                 item.Click += (_, _) =>
                 {
@@ -167,7 +197,15 @@ public sealed class TrayService : ITrayService
             flyout.Items.Add(new MenuFlyoutSeparator());
         }
 
-        var open = new MenuFlyoutItem { Text = "Open Display Presets", Icon = new FontIcon { Glyph = "\uE713" } };
+        var open = new MenuFlyoutItem
+        {
+            Text = "Open Display Presets",
+            Icon = new FontIcon
+            {
+                Glyph = "\uE713",
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xCC, 0xCC, 0xCC))
+            }
+        };
         open.Click += (_, _) =>
         {
             OpenRequested?.Invoke(this, EventArgs.Empty);
@@ -182,7 +220,15 @@ public sealed class TrayService : ITrayService
         };
         flyout.Items.Add(open);
 
-        var exit = new MenuFlyoutItem { Text = "Exit", Icon = new FontIcon { Glyph = "\uE7E8" } };
+        var exit = new MenuFlyoutItem
+        {
+            Text = "Exit",
+            Icon = new FontIcon
+            {
+                Glyph = "\uE7E8",
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xCC, 0xCC, 0xCC))
+            }
+        };
         exit.Click += (_, _) => Application.Current.Exit();
         flyout.Items.Add(exit);
 
