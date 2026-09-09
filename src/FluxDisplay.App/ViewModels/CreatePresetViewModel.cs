@@ -63,6 +63,14 @@ public sealed partial class CreatePresetViewModel : ObservableObject
         UpdateCanGoNext();
         UpdateSummary();
     }
+    // Windows has no manual DPI setting: DPI is always derived from scale,
+    // DPI = Scale% * 96 / 100 (100->96, 125->120, 150->144, 175->168,
+    // 200->192, 250->240). Keep them in sync when the user changes Scaling.
+    partial void OnScalePercentChanged(int value)
+    {
+        CurrentDpi = (int)Math.Round(value * 96.0 / 100.0);
+        UpdateSummary();
+    }
     partial void OnPresetNameChanged(string value)
     {
         CanCreate = !string.IsNullOrWhiteSpace(value) && value.Trim().Length <= PresetValidator.MaxNameLength;
