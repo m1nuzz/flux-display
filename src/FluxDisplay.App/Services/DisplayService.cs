@@ -68,12 +68,14 @@ public sealed class DisplayService : IDisplayService
 
     public async Task<DisplayMode> GetCurrentModeAsync(string displayName, CancellationToken ct = default)
     {
+        using var _ = Helpers.AppLog.Scope("DisplayService.GetCurrentModeAsync", displayName);
         var mode = await Task.Run(() => GetCurrentModeInternal(displayName), ct).ConfigureAwait(false);
         return mode ?? new DisplayMode { Width = 1920, Height = 1080, RefreshRate = 60, BitsPerPel = 32 };
     }
 
     public async Task<int> GetCurrentDpiAsync(string displayName, CancellationToken ct = default)
     {
+        using var _ = Helpers.AppLog.Scope("DisplayService.GetCurrentDpiAsync", displayName);
         var dpi = await Task.Run(() => TryGetDpi(displayName), ct).ConfigureAwait(false);
         return dpi;
     }

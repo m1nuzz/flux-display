@@ -79,6 +79,7 @@ public sealed partial class MainWindow : Window
 
     private void Navigate(string tag)
     {
+        Helpers.AppLog.Info($"MainWindow.Navigate tag={tag}");
         ViewModel.SelectedTag = tag;
         if (tag == "create")
         {

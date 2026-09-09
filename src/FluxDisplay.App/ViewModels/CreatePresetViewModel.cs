@@ -72,6 +72,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
 
     public async Task ResetAsync()
     {
+        using var _ = Helpers.AppLog.Scope("CreatePreset.ResetAsync");
         CurrentStep = 0;
         PresetName = string.Empty;
         SelectedMonitor = null;
@@ -83,14 +84,17 @@ public sealed partial class CreatePresetViewModel : ObservableObject
     [RelayCommand]
     public async Task LoadMonitorsAsync()
     {
+        using var _ = Helpers.AppLog.Scope("CreatePreset.LoadMonitorsAsync");
         IsBusy = true;
         try
         {
             Monitors.Clear();
             var displays = await _services.Display.GetDisplaysAsync().ConfigureAwait(true);
+            Helpers.AppLog.Info($"LoadMonitorsAsync got {displays.Count} displays");
             foreach (var display in displays)
             {
                 Monitors.Add(MonitorOption.FromDisplayInfo(display));
+                Helpers.AppLog.Info($"LoadMonitorsAsync added {display.DisplayName}");
             }
         }
         finally
@@ -122,6 +126,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
     [RelayCommand]
     public async Task NextAsync()
     {
+        Helpers.AppLog.Info($"CreatePreset.NextAsync step={CurrentStep} mon={SelectedMonitor?.DevicePath}");
         if (CurrentStep == 0 && SelectedMonitor is not null)
         {
             await LoadModesAsync().ConfigureAwait(true);
@@ -197,6 +202,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
 
     private async Task LoadModesAsync()
     {
+        using var _ = Helpers.AppLog.Scope("CreatePreset.LoadModesAsync", SelectedMonitor?.DisplayName);
         if (SelectedMonitor is null)
         {
             return;

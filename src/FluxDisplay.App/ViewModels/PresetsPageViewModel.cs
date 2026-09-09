@@ -32,6 +32,7 @@ public sealed partial class PresetsPageViewModel : ObservableObject
 
     public async Task ReloadAsync()
     {
+        using var _ = Helpers.AppLog.Scope("PresetsPage.ReloadAsync");
         IsBusy = true;
         try
         {
@@ -143,6 +144,7 @@ public sealed partial class PresetsPageViewModel : ObservableObject
 
     private async Task RefreshActiveAsync()
     {
+        using var _ = Helpers.AppLog.Scope("PresetsPage.RefreshActiveAsync", $"items={Items.Count}");
         foreach (var item in Items)
         {
             item.IsActive = await _services.Applier.IsPresetActiveAsync(item.Preset).ConfigureAwait(true);

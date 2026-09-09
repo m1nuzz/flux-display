@@ -21,6 +21,7 @@ public sealed partial class MonitorIdentifier : IMonitorIdentifier
 
     public async Task IdentifyAsync(IReadOnlyList<DisplayInfo> displays, int durationSeconds, CancellationToken ct = default)
     {
+        using var scope = Helpers.AppLog.Scope("MonitorIdentifier.IdentifyAsync", $"n={displays?.Count} sec={durationSeconds}");
         if (displays is null || displays.Count == 0)
         {
             return;
@@ -77,16 +78,20 @@ public sealed partial class MonitorIdentifier : IMonitorIdentifier
                                 Width = display.Bounds.Width,
                                 Height = display.Bounds.Height
                             };
+                            Helpers.AppLog.PInvoke("AppWindow.MoveAndResize",
+                                $"win={index} {rect.X},{rect.Y},{rect.Width},{rect.Height}");
                             appWindow.MoveAndResize(rect);
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            Helpers.AppLog.Error(ex, "MoveAndResize");
                         }
 
                         appWindow.IsShownInSwitchers = false;
                         // Ensure borderless topmost via Overlapped presenter + SetWindowPos HWND_TOPMOST below
                     }
 
+                    Helpers.AppLog.PInvoke("SetWindowPos", $"win={index} hwnd=0x{hwnd:X} TOPMOST");
                     _ = SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
                 }
                 catch
