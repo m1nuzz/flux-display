@@ -29,6 +29,7 @@ public sealed class DisplayService : IDisplayService
 
     public async Task<IReadOnlyList<DisplayInfo>> GetDisplaysAsync(CancellationToken ct = default)
     {
+        using var _ = Helpers.AppLog.Scope("DisplayService.GetDisplaysAsync");
         var displays = await Task.Run(() => TryEnumerateDisplays(), ct).ConfigureAwait(false);
         if (displays.Count > 0)
         {
@@ -61,6 +62,7 @@ public sealed class DisplayService : IDisplayService
 
     public async Task<IReadOnlyList<DisplayMode>> GetSupportedModesAsync(string displayName, CancellationToken ct = default)
     {
+        using var _ = Helpers.AppLog.Scope("DisplayService.GetSupportedModesAsync", displayName);
         return await Task.Run(() => TryEnumerateModes(displayName), ct).ConfigureAwait(false);
     }
 
@@ -78,14 +80,17 @@ public sealed class DisplayService : IDisplayService
 
     public async Task<DISP_CHANGE> ChangeDisplayModeAsync(string displayName, DisplayMode mode, CancellationToken ct = default)
     {
+        using var _ = Helpers.AppLog.Scope("DisplayService.ChangeDisplayModeAsync",
+            $"{displayName} {mode.Width}x{mode.Height}@{mode.RefreshRate}");
         return await Task.Run(() =>
         {
             try
             {
                 return ChangeDisplaySettingsInternal(displayName, mode);
             }
-            catch
+            catch (Exception ex)
             {
+                Helpers.AppLog.Error(ex, "ChangeDisplayModeAsync");
                 return DISP_CHANGE.Failed;
             }
         }, ct).ConfigureAwait(false);
@@ -408,7 +413,10 @@ public sealed class DisplayService : IDisplayService
         devMode.dmBitsPerPel = mode.BitsPerPel;
         devMode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY | DM_BITSPERPEL;
 
+        Helpers.AppLog.PInvoke("ChangeDisplaySettingsExW",
+            $"name={displayName} {mode.Width}x{mode.Height}@{mode.RefreshRate} bpp={mode.BitsPerPel} dmSize={devMode.dmSize}");
         var result = ChangeDisplaySettingsExWNative(displayName, ref devMode, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
+        Helpers.AppLog.PInvoke("ChangeDisplaySettingsExW", $"returned {(DISP_CHANGE)result} ({result})");
         return (DISP_CHANGE)result;
     }
 

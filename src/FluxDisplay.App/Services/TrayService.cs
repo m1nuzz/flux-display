@@ -100,6 +100,7 @@ public sealed class TrayService : ITrayService
 
     private void OnTrayLeftMouseUp()
     {
+        Helpers.AppLog.Info("TrayService.OnTrayLeftMouseUp");
         try
         {
             var window = App.MainWindow;

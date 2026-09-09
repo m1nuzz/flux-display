@@ -57,6 +57,7 @@ public sealed class DialogService : IDialogService
 
     private static async Task<ContentDialogResult> ShowAsync(ContentDialog dialog)
     {
+        Helpers.AppLog.Info($"DialogService.ShowAsync title='{dialog.Title}' hasThreadAccess check");
         var window = App.MainWindow;
         if (window is null)
         {

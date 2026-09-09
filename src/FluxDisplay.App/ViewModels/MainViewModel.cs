@@ -54,6 +54,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     public void Navigate(string tag)
     {
+        Helpers.AppLog.Info($"MainViewModel.Navigate tag={tag}");
         SelectedTag = tag;
         NavigationRequested?.Invoke(this, tag);
         if (tag == "create")

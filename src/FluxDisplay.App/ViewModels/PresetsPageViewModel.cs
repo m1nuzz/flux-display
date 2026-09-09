@@ -79,6 +79,8 @@ public sealed partial class PresetsPageViewModel : ObservableObject
             return;
         }
 
+        Helpers.AppLog.Info($"PresetsPage.ApplyAsync '{item.Name}'");
+
         var settings = await _services.SettingsStore.LoadAsync().ConfigureAwait(true);
         if (settings.ConfirmBeforeApply)
         {
@@ -112,6 +114,8 @@ public sealed partial class PresetsPageViewModel : ObservableObject
         {
             return;
         }
+
+        Helpers.AppLog.Info($"PresetsPage.DeleteAsync '{item.Name}'");
 
         var confirm = await _services.Dialog.ShowConfirmAsync("Delete preset", $"Delete '{item.Name}'?", "Delete", "Cancel").ConfigureAwait(true);
         if (!confirm)

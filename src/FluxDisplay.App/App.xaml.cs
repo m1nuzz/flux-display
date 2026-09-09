@@ -14,8 +14,99 @@ public partial class App : Application
 
     public App()
     {
+        AppLog.RunHeader(Environment.GetCommandLineArgs());
+        AppLog.Info("App ctor");
+        AppLog.LogDumpHint();
+        AttachCrashLogging();
         InitializeComponent();
         RequestedTheme = ApplicationTheme.Dark;
+    }
+
+    // Diagnosis for native "Unknown Hard Error" crashes: managed handlers will
+    // not fire for a true native fault, but the log still shows the last
+    // managed scope before death. FirstChanceException is filtered to our own
+    // frames to avoid flooding the log with handled framework exceptions.
+    private void AttachCrashLogging()
+    {
+        try
+        {
+            UnhandledException += (_, e) =>
+            {
+                try
+                {
+                    AppLog.Error(e.Exception, "App.UnhandledException");
+                }
+                catch
+                {
+                }
+            };
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                try
+                {
+                    if (e.ExceptionObject is Exception ex)
+                    {
+                        AppLog.Error(ex, "AppDomain.UnhandledException");
+                    }
+                    else
+                    {
+                        AppLog.Error($"AppDomain.UnhandledException non-Exception: {e.ExceptionObject}");
+                    }
+                }
+                catch
+                {
+                }
+            };
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                try
+                {
+                    AppLog.Error(e.Exception, "TaskScheduler.UnobservedTaskException");
+                    e.SetObserved();
+                }
+                catch
+                {
+                }
+            };
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            AppDomain.CurrentDomain.FirstChanceException += (_, e) =>
+            {
+                try
+                {
+                    var stack = e.Exception.StackTrace ?? string.Empty;
+                    if (stack.Contains("FluxDisplay", StringComparison.Ordinal))
+                    {
+                        AppLog.Error(e.Exception, "FirstChance");
+                    }
+                }
+                catch
+                {
+                }
+            };
+        }
+        catch
+        {
+        }
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)

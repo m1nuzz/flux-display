@@ -35,6 +35,7 @@ public sealed class PresetApplier : IPresetApplier
     public async Task<bool> ApplyAsync(Preset preset, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(preset);
+        using var _ = Helpers.AppLog.Scope("PresetApplier.ApplyAsync", $"'{preset.Name}' {preset.Mode.Width}x{preset.Mode.Height}@{preset.Mode.RefreshRate}");
 
         // Resolve display by DevicePath.
         var display = await _displayService.GetDisplayByDevicePathAsync(preset.DevicePath, ct).ConfigureAwait(false);

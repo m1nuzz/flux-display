@@ -102,6 +102,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
     [RelayCommand]
     public async Task IdentifyAsync()
     {
+        using var _ = Helpers.AppLog.Scope("CreatePreset.IdentifyAsync");
         var settings = await _services.SettingsStore.LoadAsync().ConfigureAwait(true);
         var displays = await _services.Display.GetDisplaysAsync().ConfigureAwait(true);
         await _services.Identifier.IdentifyAsync(displays, settings.IdentifyOverlaySeconds).ConfigureAwait(true);
@@ -155,6 +156,8 @@ public sealed partial class CreatePresetViewModel : ObservableObject
     [RelayCommand]
     public async Task CreateAsync()
     {
+        using var _ = Helpers.AppLog.Scope("CreatePreset.CreateAsync",
+            $"mon={SelectedMonitor?.DevicePath} res={SelectedResolution} hz={SelectedRefreshRate}");
         if (SelectedMonitor is null || SelectedResolution is null || SelectedRefreshRate <= 0)
         {
             return;
