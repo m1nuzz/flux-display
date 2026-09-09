@@ -128,7 +128,36 @@ public sealed class TrayService : ITrayService
         OpenRequested?.Invoke(this, EventArgs.Empty);
     }
 
+    // CRASH FIX (H.NotifyIcon #229): every assignment to ContextFlyout makes the
+    // library create a new hidden SecondWindow + SetWindowSubclass with a new
+    // delegate that overwrites a single static slot. Old windows leak, old
+    // delegates get GC'd, and the next message to an orphaned window kills the
+    // process with FailFast("callback on a garbage collected SUBCLASSPROC").
+    // So the flyout is built ONCE and presets are mutated in place afterwards.
+    // H.NotifyIcon copies our items into its internal flyout at Prepare time,
+    // but they are the SAME objects, so in-place Text/Visibility/Tag edits
+    // stay visible. Never re-assign ContextFlyout, never touch Items after.
+    private const int MaxMenuPresets = 10;
+    private const double MenuItemMinWidth = 250.0;
+    private readonly List<MenuFlyoutItem> _presetSlots = new();
+    private MenuFlyoutItem? _emptyItem;
+
     private void RebuildMenu()
+    {
+        if (_taskbarIcon is null)
+        {
+            return;
+        }
+
+        if (_taskbarIcon.ContextFlyout is null)
+        {
+            BuildMenuOnce();
+        }
+
+        RefreshMenuItems();
+    }
+
+    private void BuildMenuOnce()
     {
         if (_taskbarIcon is null)
         {
@@ -155,8 +184,6 @@ public sealed class TrayService : ITrayService
         {
         }
 
-        const double MenuItemMinWidth = 250.0;
-
         var header = new MenuFlyoutItem
         {
             Text = "Display Presets",
@@ -171,39 +198,32 @@ public sealed class TrayService : ITrayService
         flyout.Items.Add(header);
         flyout.Items.Add(new MenuFlyoutSeparator());
 
-        if (_presets.Count > 0)
+        for (var i = 0; i < MaxMenuPresets; i++)
         {
-            foreach (var preset in _presets.Take(10))
+            var slot = new MenuFlyoutItem
             {
-                var subtitle = $"{preset.FriendlyMonitorName} \u00B7 {preset.Mode.RefreshRate} Hz";
-                var item = new MenuFlyoutItem
+                MinWidth = MenuItemMinWidth,
+                Visibility = Visibility.Collapsed,
+                Icon = new FontIcon
                 {
-                    Text = $"{preset.Name} — {subtitle}",
-                    Tag = preset.Id,
-                    MinWidth = MenuItemMinWidth,
-                    Icon = new FontIcon
-                    {
-                        Glyph = "\uE7F4",
-                        Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xE6, 0xE6, 0xE6))
-                    }
-                };
-                item.Click += (_, _) =>
+                    Glyph = "\uE7F4",
+                    Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xE6, 0xE6, 0xE6))
+                }
+            };
+            slot.Click += (_, _) =>
+            {
+                if (slot.Tag is Guid id)
                 {
-                    if (item.Tag is Guid id)
-                    {
-                        PresetApplyRequested?.Invoke(this, id);
-                    }
-                };
-                flyout.Items.Add(item);
-            }
-            flyout.Items.Add(new MenuFlyoutSeparator());
+                    PresetApplyRequested?.Invoke(this, id);
+                }
+            };
+            _presetSlots.Add(slot);
+            flyout.Items.Add(slot);
         }
-        else
-        {
-            var empty = new MenuFlyoutItem { Text = "No presets", IsEnabled = false, MinWidth = MenuItemMinWidth };
-            flyout.Items.Add(empty);
-            flyout.Items.Add(new MenuFlyoutSeparator());
-        }
+
+        _emptyItem = new MenuFlyoutItem { Text = "No presets", IsEnabled = false, MinWidth = MenuItemMinWidth };
+        flyout.Items.Add(_emptyItem);
+        flyout.Items.Add(new MenuFlyoutSeparator());
 
         var open = new MenuFlyoutItem
         {
@@ -242,7 +262,36 @@ public sealed class TrayService : ITrayService
         exit.Click += (_, _) => Application.Current.Exit();
         flyout.Items.Add(exit);
 
+        // Assigned exactly once per process. See crash note above.
         _taskbarIcon.ContextFlyout = flyout;
+        Helpers.AppLog.Info("TrayService menu built once");
+    }
+
+    private void RefreshMenuItems()
+    {
+        var presets = _presets.Take(MaxMenuPresets).ToList();
+        for (var i = 0; i < _presetSlots.Count; i++)
+        {
+            var slot = _presetSlots[i];
+            if (i < presets.Count)
+            {
+                var preset = presets[i];
+                slot.Text = $"{preset.Name} — {preset.FriendlyMonitorName} \u00B7 {preset.Mode.RefreshRate} Hz";
+                slot.Tag = preset.Id;
+                slot.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                slot.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        if (_emptyItem is not null)
+        {
+            _emptyItem.Visibility = presets.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        Helpers.AppLog.Info($"TrayService menu refreshed presets={presets.Count}");
     }
 
     private Microsoft.UI.Xaml.Media.ImageSource? TryCreateLooseFileIcon()
