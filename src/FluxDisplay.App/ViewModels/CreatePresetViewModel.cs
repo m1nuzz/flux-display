@@ -115,6 +115,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
     [RelayCommand]
     public void SelectMonitor(MonitorOption? option)
     {
+        Helpers.AppLog.Info($"CreatePreset.SelectMonitor {option?.DevicePath}");
         foreach (var item in Monitors)
         {
             item.IsSelected = option is not null && item.DevicePath == option.DevicePath;

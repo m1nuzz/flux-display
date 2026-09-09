@@ -32,6 +32,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public async Task LoadAsync()
     {
+        using var _ = Helpers.AppLog.Scope("Settings.LoadAsync");
         var settings = await _services.SettingsStore.LoadAsync().ConfigureAwait(true);
         IsLoaded = false;
         StartWithWindows = settings.StartWithWindows;

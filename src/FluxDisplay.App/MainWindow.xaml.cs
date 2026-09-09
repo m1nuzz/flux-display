@@ -91,6 +91,7 @@ public sealed partial class MainWindow : Window
             "create" => new CreatePresetPage { DataContext = ViewModel.Create },
             _ => new PresetsPage { DataContext = ViewModel.Presets }
         };
+        Helpers.AppLog.Info($"MainWindow.Navigate content set tag={tag}");
 
         foreach (var menu in NavView.MenuItems.OfType<NavigationViewItem>())
         {
