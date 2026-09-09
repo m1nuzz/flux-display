@@ -25,6 +25,13 @@ publish/
 *.pfx
 *.cer
 
+# Local agent/tooling configs (machine-specific, managed by repowise/opencode)
+.mcp.json
+opencode.json
+opencode.jsonc
+AGENTS.md
+HANDOFF.md
+
 # MSIX
 *.msix
 *.msixbundle
