@@ -240,11 +240,12 @@ public sealed class TrayService : ITrayService
 
     private static Uri TryGetTrayIconUri()
     {
-        // NOTE: BitmapImage cannot reliably decode .ico — use PNG for the tray.
-        // tray.png is a 32px monitor drawn for small sizes (thick borders).
+        // NOTE: H.NotifyIcon renders .ico reliably; PNG via BitmapImage came out
+        // blank in the overflow. tray.ico now has thick borders (16/32/48 drawn
+        // for small sizes), so the monitor reads at 16px.
         try
         {
-            return new Uri("ms-appx:///Assets/tray.png");
+            return new Uri("ms-appx:///Assets/tray.ico");
         }
         catch
         {
