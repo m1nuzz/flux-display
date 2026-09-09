@@ -24,6 +24,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
     public ObservableCollection<MonitorOption> Monitors { get; }
     public ObservableCollection<string> Resolutions { get; }
     public ObservableCollection<int> RefreshRates { get; }
+    public ObservableCollection<int> ScaleOptions { get; } = [100, 125, 150, 175, 200, 225, 250];
 
     [ObservableProperty] private int _currentStep;
     [ObservableProperty] private MonitorOption? _selectedMonitor;
@@ -211,6 +212,11 @@ public sealed partial class CreatePresetViewModel : ObservableObject
 
         CurrentDpi = SelectedMonitor.CurrentDpi;
         ScalePercent = SelectedMonitor.ScalePercent;
+        if (!ScaleOptions.Contains(ScalePercent))
+        {
+            ScaleOptions.Add(ScalePercent);
+        }
+
         _allModes = await _services.Display.GetSupportedModesAsync(SelectedMonitor.DisplayName).ConfigureAwait(true);
         Resolutions.Clear();
         foreach (var resolution in _allModes.Select(m => $"{m.Width} × {m.Height}").Distinct())
@@ -221,10 +227,22 @@ public sealed partial class CreatePresetViewModel : ObservableObject
         var current = $"{SelectedMonitor.CurrentMode.Width} × {SelectedMonitor.CurrentMode.Height}";
         SelectedResolution = Resolutions.Contains(current) ? current : Resolutions.FirstOrDefault();
         RebuildRefreshRates();
-        if (RefreshRates.Contains(SelectedMonitor.CurrentMode.RefreshRate))
+
+        // Prefer the refresh rate Windows currently uses; fall back to max.
+        // RebuildRefreshRates already picks FirstOrDefault (max, desc) when the
+        // previous value is missing, so only override when current is available.
+        var currentHz = SelectedMonitor.CurrentMode.RefreshRate;
+        if (RefreshRates.Contains(currentHz))
         {
-            SelectedRefreshRate = SelectedMonitor.CurrentMode.RefreshRate;
+            SelectedRefreshRate = currentHz;
         }
+        else if (!RefreshRates.Contains(SelectedRefreshRate) && RefreshRates.Count > 0)
+        {
+            SelectedRefreshRate = RefreshRates[0];
+        }
+
+        Helpers.AppLog.Info($"LoadModesAsync done modes={_allModes.Count} res={Resolutions.Count} " +
+            $"rates={RefreshRates.Count} selRes={SelectedResolution} selHz={SelectedRefreshRate} curHz={currentHz}");
     }
 
     private void RebuildRefreshRates()

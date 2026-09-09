@@ -47,7 +47,11 @@
                         MinWidth="280"
                         ItemsSource="{Binding RefreshRates}"
                         SelectedItem="{Binding SelectedRefreshRate, Mode=TwoWay}" />
-                    <ComboBox Header="Scaling" IsEnabled="False" SelectedItem="{Binding ScalePercent}" />
+                    <ComboBox
+                        Header="Scaling"
+                        MinWidth="280"
+                        ItemsSource="{Binding ScaleOptions}"
+                        SelectedItem="{Binding ScalePercent, Mode=TwoWay}" />
                     <TextBox Header="DPI" IsReadOnly="True" Text="{Binding CurrentDpi}" />
                 </StackPanel>
 

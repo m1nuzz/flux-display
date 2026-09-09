@@ -325,8 +325,49 @@ public sealed class DisplayService : IDisplayService
         }
     }
 
+    private const int MDT_EFFECTIVE_DPI = 0;
+
+    [DllImport("shcore.dll", SetLastError = true)]
+    private static extern int GetDpiForMonitorNative(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
+
     private static int TryGetDpi(string displayName)
     {
+        // Per-monitor DPI via GetDpiForMonitor. dmLogPixels from DEVMODE is
+        // system-wide (same value for every monitor), so it must only be a fallback.
+        try
+        {
+            uint found = 0;
+            FluxDisplay.App.Native.MonitorEnumProc callback = (IntPtr hMonitor, IntPtr hdcMonitor, ref FluxDisplay.App.Native.RECT lprcMonitor, IntPtr dwData) =>
+            {
+                var info = new FluxDisplay.App.Native.MONITORINFOEXW();
+                info.cbSize = (uint)Marshal.SizeOf<FluxDisplay.App.Native.MONITORINFOEXW>();
+                if (GetMonitorInfoWNative(hMonitor, ref info)
+                    && string.Equals(info.szDevice, displayName, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (GetDpiForMonitorNative(hMonitor, MDT_EFFECTIVE_DPI, out var dx, out _) == 0 && dx > 0)
+                    {
+                        found = dx;
+                    }
+
+                    return false;
+                }
+
+                return true;
+            };
+
+            EnumDisplayMonitorsNative(IntPtr.Zero, IntPtr.Zero, callback, IntPtr.Zero);
+            GC.KeepAlive(callback);
+            if (found > 0)
+            {
+                Helpers.AppLog.PInvoke("GetDpiForMonitor", $"{displayName} -> {found}");
+                return (int)found;
+            }
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "TryGetDpi.monitor");
+        }
+
         try
         {
             var devMode = new FluxDisplay.App.Native.DEVMODEW();
@@ -336,6 +377,7 @@ public sealed class DisplayService : IDisplayService
                 var logPixels = devMode.dmLogPixels;
                 if (logPixels > 0)
                 {
+                    Helpers.AppLog.PInvoke("TryGetDpi.fallback", $"{displayName} dmLogPixels={logPixels}");
                     return logPixels;
                 }
             }
