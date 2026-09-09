@@ -1,5 +1,6 @@
 using FluxDisplay.App.Helpers;
 using FluxDisplay.App.Models;
+using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
