@@ -29,7 +29,10 @@ public sealed partial class CreatePresetViewModel : ObservableObject
     [ObservableProperty] private int _currentStep;
     [ObservableProperty] private MonitorOption? _selectedMonitor;
     [ObservableProperty] private string? _selectedResolution;
-    [ObservableProperty] private int _selectedRefreshRate;
+    // Nullable: ComboBox pushes null into SelectedItem on ItemsSource.Clear().
+    // With a plain int that TwoWay write-back fails and permanently breaks the
+    // binding (combo stays empty despite a correct VM value). int? survives it.
+    [ObservableProperty] private int? _selectedRefreshRate;
     [ObservableProperty] private int _currentDpi;
     [ObservableProperty] private int _scalePercent = 100;
     [ObservableProperty] private string _presetName = string.Empty;
@@ -55,7 +58,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
         UpdateCanGoNext();
         UpdateSummary();
     }
-    partial void OnSelectedRefreshRateChanged(int value)
+    partial void OnSelectedRefreshRateChanged(int? value)
     {
         UpdateCanGoNext();
         UpdateSummary();
@@ -78,7 +81,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
         PresetName = string.Empty;
         SelectedMonitor = null;
         SelectedResolution = null;
-        SelectedRefreshRate = 0;
+        SelectedRefreshRate = null;
         await LoadMonitorsAsync().ConfigureAwait(true);
     }
 
@@ -136,7 +139,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
             return;
         }
 
-        if (CurrentStep == 1 && SelectedResolution is not null && SelectedRefreshRate > 0)
+        if (CurrentStep == 1 && SelectedResolution is not null && (SelectedRefreshRate ?? 0) > 0)
         {
             if (string.IsNullOrWhiteSpace(PresetName) && SelectedMonitor is not null)
             {
@@ -165,7 +168,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
     {
         using var _ = Helpers.AppLog.Scope("CreatePreset.CreateAsync",
             $"mon={SelectedMonitor?.DevicePath} res={SelectedResolution} hz={SelectedRefreshRate}");
-        if (SelectedMonitor is null || SelectedResolution is null || SelectedRefreshRate <= 0)
+        if (SelectedMonitor is null || SelectedResolution is null || (SelectedRefreshRate ?? 0) <= 0)
         {
             return;
         }
@@ -186,7 +189,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
             {
                 Width = width,
                 Height = height,
-                RefreshRate = SelectedRefreshRate,
+                RefreshRate = SelectedRefreshRate ?? 0,
                 BitsPerPel = 32
             },
             ScalePercent = ScalePercent
@@ -236,7 +239,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
         {
             SelectedRefreshRate = currentHz;
         }
-        else if (!RefreshRates.Contains(SelectedRefreshRate) && RefreshRates.Count > 0)
+        else if ((SelectedRefreshRate is null || !RefreshRates.Contains(SelectedRefreshRate.Value)) && RefreshRates.Count > 0)
         {
             SelectedRefreshRate = RefreshRates[0];
         }
@@ -264,9 +267,9 @@ public sealed partial class CreatePresetViewModel : ObservableObject
             RefreshRates.Add(rate);
         }
 
-        if (!RefreshRates.Contains(SelectedRefreshRate))
+        if (SelectedRefreshRate is null || !RefreshRates.Contains(SelectedRefreshRate.Value))
         {
-            SelectedRefreshRate = RefreshRates.FirstOrDefault();
+            SelectedRefreshRate = RefreshRates.Count > 0 ? RefreshRates[0] : null;
         }
     }
 
@@ -275,7 +278,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
         CanGoNext = CurrentStep switch
         {
             0 => SelectedMonitor is not null,
-            1 => SelectedResolution is not null && SelectedRefreshRate > 0,
+            1 => SelectedResolution is not null && (SelectedRefreshRate ?? 0) > 0,
             _ => false
         };
     }
