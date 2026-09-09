@@ -131,9 +131,12 @@ public partial class App : Application
 
     private static void TrimWorkingSet()
     {
+        // (SIZE_T)-1 for both min and max asks the OS to trim the working set
+        // (EmptyWorkingSet equivalent). nint.MaxValue here is NOT -1: it requests
+        // an 8 EB working set, which causes "Unknown Hard Error" on minimize.
         try
         {
-            _ = SetProcessWorkingSetSize(GetCurrentProcess(), nint.MaxValue, nint.MaxValue);
+            _ = SetProcessWorkingSetSize(GetCurrentProcess(), new nint(-1), new nint(-1));
         }
         catch
         {
