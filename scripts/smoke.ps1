@@ -21,7 +21,7 @@ Write-Host "`n[2/4] Running App smoke tests (DisplayService)..." -ForegroundColo
 dotnet test (Join-Path $repoRoot "tests/FluxDisplay.App.Tests/FluxDisplay.App.Tests.csproj") --configuration $Configuration -p:Platform=$Platform --verbosity minimal
 if ($LASTEXITCODE -ne 0) { throw "App smoke tests failed" }
 
-# 3. Build App (single-project MSIX path validation)
+# 3. Build App
 Write-Host "`n[3/4] Building FluxDisplay.App..." -ForegroundColor Yellow
 dotnet build (Join-Path $repoRoot "src/FluxDisplay.App/FluxDisplay.App.csproj") --configuration $Configuration -p:Platform=$Platform --verbosity minimal
 if ($LASTEXITCODE -ne 0) { throw "App build failed" }

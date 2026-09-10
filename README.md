@@ -13,7 +13,7 @@ Presets live in `%LOCALAPPDATA%\FluxDisplay\presets.json` and are applied with `
 - Identify overlays so you can tell which physical monitor is which
 - Active-preset badge when the current modes match a saved preset
 - Confirm-before-apply, start with Windows, start minimized, theme
-- Unpackaged portable build and sideload MSIX from CI
+- Unpackaged portable build and classic EXE installer from CI
 
 ## Requirements
 
@@ -59,7 +59,7 @@ Core-only on Linux:
 dotnet test tests/FluxDisplay.Core.Tests/FluxDisplay.Core.Tests.csproj --configuration Release
 ```
 
-CI (`.github/workflows/ci.yml`) runs Core tests on Ubuntu, then builds portable ZIP + test-signed MSIX on Windows.
+CI (`.github/workflows/ci.yml`) runs Core tests on Ubuntu, then builds portable ZIP + EXE installer (Inno Setup) on Windows.
 
 ## Usage
 
