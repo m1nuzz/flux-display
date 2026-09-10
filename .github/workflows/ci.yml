@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   core-tests:
     name: Core unit tests and smoke checks
@@ -194,3 +197,40 @@ jobs:
             ./artifacts/FluxDisplay-win-x64-setup.sha256
           if-no-files-found: error
           retention-days: 14
+
+  github-release:
+    name: Publish GitHub Release (stable download links for reputation)
+    runs-on: ubuntu-latest
+    needs: windows-build
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: FluxDisplay-win-x64-installer
+          path: ./release-assets
+      - name: Download portable artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: FluxDisplay-win-x64-portable
+          path: ./release-portable
+      - name: Pack portable ZIP
+        run: |
+          cd ./release-portable
+          zip -r ../release-assets/FluxDisplay-win-x64-portable.zip "Flux Display"
+          cd ../release-assets
+          sha256sum FluxDisplay-win-x64-portable.zip | awk '{ print $1 "  FluxDisplay-win-x64-portable.zip" }' > FluxDisplay-win-x64-portable.sha256
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./release-assets/FluxDisplay-win-x64-setup.exe
+            ./release-assets/FluxDisplay-win-x64-portable.zip
+            ./release-assets/INSTALL-SETUP.txt
+            ./release-assets/FluxDisplay-win-x64-setup.sha256
+            ./release-assets/FluxDisplay-win-x64-portable.sha256
+          body: |
+            `FluxDisplay-win-x64-setup.exe` — installer, no admin rights required.
+            `FluxDisplay-win-x64-portable.zip` — unpack and run `Flux Display/FluxDisplay.App.exe`, no install.
+            No certificate yet, so the first downloads may show a SmartScreen / Chrome
+            reputation warning — the files are clean, verify via the `.sha256` files.
