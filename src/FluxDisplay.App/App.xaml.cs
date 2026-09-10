@@ -174,6 +174,12 @@ public partial class App : Application
         MainWindow = window;
         window.SystemBackdrop = new MicaBackdrop();
         window.ExtendsContentIntoTitleBar = true;
+        // Initialize the tray early so its menu host exists, then warm the
+        // menu up while everything is still invisible (see WarmUpMenuHost).
+        // MainViewModel.InitializeAsync calls Tray.Initialize() again later,
+        // which early-returns as already initialized.
+        Services.Tray.Initialize();
+        Services.Tray.WarmUpMenuHost();
         window.Activate();
         AsyncHelper.FireAndForget(async () =>
         {

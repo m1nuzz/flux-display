@@ -136,6 +136,87 @@ public sealed class TrayService : ITrayService
         });
     }
 
+    // One-time warm-up for the library's internal menu flyout. On high-DPI
+    // displays the first tray open measures with RasterizationScale fallback
+    // (XamlRoot is null until the flyout is shown once), producing an
+    // undersized host window with scroll buttons; later opens are fine.
+    // We ShowAt the flyout far off-screen and hide it right away: no visible
+    // flash, but the flyout gets an XamlRoot and caches fonts, so the first
+    // real open measures correctly. Best-effort: any failure just keeps the
+    // old (self-healing on second open) behavior.
+    public bool WarmUpMenuHost()
+    {
+        try
+        {
+            // Immediate attempt (usually skipped pre-Activate: no XamlRoot yet).
+            WarmUpNow();
+            // Real attempt after the first frame has rendered.
+            App.MainWindow?.DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                () => _ = DelayedWarmUpAsync());
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "menu-warmup.schedule");
+            return false;
+        }
+    }
+
+    private async Task DelayedWarmUpAsync()
+    {
+        try
+        {
+            await Task.Delay(800).ConfigureAwait(true);
+            WarmUpNow();
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "menu-warmup.delayed");
+        }
+    }
+
+    private void WarmUpNow()
+    {
+        try
+        {
+            const System.Reflection.BindingFlags flags =
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var flyoutProp = typeof(TaskbarIcon).GetProperty("ContextMenuFlyout", flags);
+            var flyout = _taskbarIcon is not null
+                ? flyoutProp?.GetValue(_taskbarIcon) as MenuFlyout
+                : null;
+            if (flyout is null)
+            {
+                Helpers.AppLog.Info("menu-warmup skipped: no internal flyout");
+                return;
+            }
+
+            // The flyout is already associated with the hidden host window's
+            // tree (showing it against the main window throws "already
+            // associated with a XamlRoot"). Warm it up in place: ShowAt+Hide
+            // in the same UI tick forces template realization and measurement
+            // without ever painting (mirrors the library's own frame.Loaded).
+            var windowProp = typeof(TaskbarIcon).GetProperty("ContextMenuWindow", flags);
+            var hostContent = (_taskbarIcon is not null
+                ? windowProp?.GetValue(_taskbarIcon) as Window
+                : null)?.Content as FrameworkElement;
+            if (hostContent is null)
+            {
+                Helpers.AppLog.Info("menu-warmup skipped: no host content");
+                return;
+            }
+
+            flyout.ShowAt(hostContent);
+            flyout.Hide();
+            Helpers.AppLog.Info("menu-warmup done");
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "menu-warmup");
+        }
+    }
+
     internal bool TryShowContextFlyout()
     {
         if (_taskbarIcon?.ContextFlyout is not MenuFlyout flyout)
