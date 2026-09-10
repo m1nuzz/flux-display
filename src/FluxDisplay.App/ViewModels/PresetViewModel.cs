@@ -28,6 +28,7 @@ public sealed partial class PresetViewModel : ObservableObject
 
     public IAsyncRelayCommand? ApplyCommand { get; set; }
     public IAsyncRelayCommand? DeleteCommand { get; set; }
+    public IRelayCommand? EditCommand { get; set; }
 
     public PresetCardModel ToCard() => new()
     {

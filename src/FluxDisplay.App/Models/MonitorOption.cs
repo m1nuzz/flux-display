@@ -20,7 +20,11 @@ public sealed partial class MonitorOption : ObservableObject
     // 1-based number in enumeration order — matches the Identify overlay numbers.
     public int DisplayNumber { get; set; } = 1;
 
-    public string DisplayTitle => $"{DisplayNumber} · {(IsPrimary ? $"{FriendlyName} (Primary)" : FriendlyName)}";
+    // False for synthetic options built from a preset whose monitor is
+    // currently disconnected. Still selectable and editable.
+    public bool IsAvailable { get; set; } = true;
+
+    public string DisplayTitle => $"{DisplayNumber} · {(IsPrimary ? $"{FriendlyName} (Primary)" : FriendlyName)}{(IsAvailable ? string.Empty : " (offline)")}";
     public string ResolutionText => $"{CurrentMode.Width} × {CurrentMode.Height} @ {CurrentMode.RefreshRate} Hz";
     public string ScaleText => $"{ScalePercent}% · {CurrentDpi} DPI";
 

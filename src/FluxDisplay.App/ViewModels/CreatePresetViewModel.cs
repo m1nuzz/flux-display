@@ -30,6 +30,8 @@ public sealed partial class CreatePresetViewModel : ObservableObject
     [ObservableProperty] private bool _canCreate;
     [ObservableProperty] private string _summary = string.Empty;
     [ObservableProperty] private bool _isBusy;
+    [ObservableProperty] private bool _isEditing;
+    [ObservableProperty] private string _saveButtonText = "Create preset";
 
     public IReadOnlyList<StepInfo> Steps =>
     [
@@ -39,7 +41,10 @@ public sealed partial class CreatePresetViewModel : ObservableObject
     ];
 
     public event EventHandler<Preset>? PresetCreated;
+    public event EventHandler<Preset>? PresetUpdated;
     public event EventHandler? Cancelled;
+
+    private Preset? _editingSource;
 
     partial void OnPresetNameChanged(string value)
     {
@@ -56,11 +61,95 @@ public sealed partial class CreatePresetViewModel : ObservableObject
     public async Task ResetAsync()
     {
         using var _ = Helpers.AppLog.Scope("CreatePreset.ResetAsync");
+        _editingSource = null;
+        IsEditing = false;
+        SaveButtonText = "Create preset";
         CurrentStep = 0;
         PresetName = string.Empty;
         SelectedMonitor = null;
         TargetDrafts.Clear();
         await LoadMonitorsAsync().ConfigureAwait(true);
+    }
+
+    public async Task StartEditAsync(Preset preset)
+    {
+        using var _ = Helpers.AppLog.Scope("CreatePreset.StartEditAsync", $"'{preset.Name}'");
+        ArgumentNullException.ThrowIfNull(preset);
+        _editingSource = preset;
+        IsEditing = true;
+        SaveButtonText = "Save changes";
+        CurrentStep = 0;
+        PresetName = preset.Name;
+        SelectedMonitor = null;
+        TargetDrafts.Clear();
+        await LoadMonitorsAsync().ConfigureAwait(true);
+
+        // Match preset targets to live monitors; missing ones become
+        // greyed-out offline cards that stay selectable and editable.
+        var targets = preset.GetTargets();
+        var number = Monitors.Count + 1;
+        foreach (var target in targets)
+        {
+            var match = Monitors.FirstOrDefault(m =>
+                string.Equals(m.DevicePath, target.DevicePath, StringComparison.OrdinalIgnoreCase));
+            if (match is null)
+            {
+                match = new MonitorOption
+                {
+                    DevicePath = target.DevicePath,
+                    DisplayName = target.DevicePath,
+                    FriendlyName = target.FriendlyMonitorName,
+                    AdapterName = string.Empty,
+                    IsPrimary = false,
+                    Bounds = new Rect(0, 0, 0, 0),
+                    CurrentMode = target.Mode,
+                    CurrentDpi = target.ScalePercent * 96 / 100,
+                    ScalePercent = target.ScalePercent,
+                    DisplayNumber = number++,
+                    IsAvailable = false
+                };
+                Monitors.Add(match);
+            }
+
+            match.IsSelected = true;
+        }
+
+        await LoadModesAsync(SelectedMonitors().ToList()).ConfigureAwait(true);
+
+        // Force stored values into the drafts even when the live mode lists
+        // (or the fallback list for offline monitors) do not contain them.
+        foreach (var draft in TargetDrafts)
+        {
+            var target = targets.FirstOrDefault(t =>
+                string.Equals(t.DevicePath, draft.Monitor.DevicePath, StringComparison.OrdinalIgnoreCase));
+            if (target is null)
+            {
+                continue;
+            }
+
+            var resolution = $"{target.Mode.Width} × {target.Mode.Height}";
+            if (!draft.Resolutions.Contains(resolution))
+            {
+                draft.Resolutions.Add(resolution);
+            }
+
+            draft.SelectedResolution = resolution;
+            if (!draft.RefreshRates.Contains(target.Mode.RefreshRate))
+            {
+                draft.RefreshRates.Add(target.Mode.RefreshRate);
+            }
+
+            draft.SelectedRefreshRate = target.Mode.RefreshRate;
+            if (!draft.ScaleOptions.Contains(target.ScalePercent))
+            {
+                draft.ScaleOptions.Add(target.ScalePercent);
+            }
+
+            draft.ScalePercent = target.ScalePercent;
+        }
+
+        UpdateCanGoNext();
+        UpdateSummary();
     }
 
     [RelayCommand]
@@ -169,12 +258,15 @@ public sealed partial class CreatePresetViewModel : ObservableObject
         var primary = targets[0];
         var preset = new Preset
         {
+            Id = _editingSource?.Id ?? Guid.NewGuid(),
             Name = PresetName.Trim(),
             DevicePath = primary.DevicePath,
             FriendlyMonitorName = primary.FriendlyMonitorName,
             Mode = primary.Mode,
             ScalePercent = primary.ScalePercent,
-            Targets = targets
+            Targets = targets,
+            CreatedAt = _editingSource?.CreatedAt ?? DateTime.UtcNow,
+            LastAppliedAt = _editingSource?.LastAppliedAt
         };
 
         var errors = _validator.Validate(ToCore(preset));
@@ -184,7 +276,15 @@ public sealed partial class CreatePresetViewModel : ObservableObject
             return;
         }
 
-        PresetCreated?.Invoke(this, preset);
+        if (_editingSource is not null)
+        {
+            Helpers.AppLog.Info($"CreatePreset saving edit '{preset.Name}'");
+            PresetUpdated?.Invoke(this, preset);
+        }
+        else
+        {
+            PresetCreated?.Invoke(this, preset);
+        }
     }
 
     private IEnumerable<MonitorOption> SelectedMonitors() => Monitors.Where(item => item.IsSelected);

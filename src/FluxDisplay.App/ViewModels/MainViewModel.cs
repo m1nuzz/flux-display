@@ -41,11 +41,30 @@ public sealed partial class MainViewModel : ObservableObject
         _services.Tray.OpenRequested += (_, _) => RequestShowWindow?.Invoke(this, EventArgs.Empty);
         _services.Tray.PresetApplyRequested += async (_, id) => await Presets.ApplyByIdAsync(id).ConfigureAwait(true);
         Presets.PresetsChanged += async (_, _) => await SyncTrayAsync().ConfigureAwait(true);
+        Presets.EditRequested += (_, id) => BeginEdit(id);
         Create.PresetCreated += async (_, preset) =>
         {
             await Presets.AddPresetAsync(preset).ConfigureAwait(true);
             Navigate("presets");
         };
+        Create.PresetUpdated += async (_, preset) =>
+        {
+            await Presets.UpdatePresetAsync(preset).ConfigureAwait(true);
+            Navigate("presets");
+        };
+    }
+
+    private void BeginEdit(Guid id)
+    {
+        var item = Presets.Items.FirstOrDefault(i => i.Id == id);
+        if (item is null)
+        {
+            return;
+        }
+
+        Helpers.AppLog.Info($"MainViewModel.BeginEdit '{item.Name}'");
+        Navigate("edit");
+        _ = Create.StartEditAsync(item.Preset);
     }
 
     public event EventHandler? RequestShowWindow;

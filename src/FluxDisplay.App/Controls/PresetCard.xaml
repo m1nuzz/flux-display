@@ -36,6 +36,7 @@
                 <Button Content="⋯">
                     <Button.Flyout>
                         <MenuFlyout>
+                            <MenuFlyoutItem Text="Edit" Command="{Binding EditCommand}" CommandParameter="{Binding}" />
                             <MenuFlyoutItem Text="Delete" Command="{Binding DeleteCommand}" CommandParameter="{Binding}" />
                         </MenuFlyout>
                     </Button.Flyout>

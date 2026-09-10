@@ -26,9 +26,46 @@ public sealed partial class PresetsPageViewModel : ObservableObject
 
     public event EventHandler? PresetsChanged;
     public event EventHandler? AddRequested;
+    public event EventHandler<Guid>? EditRequested;
 
     [RelayCommand]
     public void RequestAdd() => AddRequested?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
+    public void Edit(PresetViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        Helpers.AppLog.Info($"PresetsPage.Edit '{item.Name}'");
+        EditRequested?.Invoke(this, item.Id);
+    }
+
+    public async Task UpdatePresetAsync(Preset preset)
+    {
+        using var _ = Helpers.AppLog.Scope("PresetsPage.UpdatePresetAsync", $"'{preset.Name}'");
+        var collection = await _services.Presets.LoadAsync().ConfigureAwait(true);
+        var index = collection.Presets.FindIndex(p => p.Id == preset.Id);
+        if (index < 0)
+        {
+            // Edited preset vanished meanwhile — fall back to adding it back.
+            await AddPresetAsync(preset).ConfigureAwait(true);
+            return;
+        }
+
+        collection.Presets[index] = preset;
+        await _services.Presets.SaveAsync(collection).ConfigureAwait(true);
+        var itemIndex = Items.ToList().FindIndex(i => i.Id == preset.Id);
+        if (itemIndex >= 0)
+        {
+            Items[itemIndex] = Bind(preset);
+        }
+
+        await RefreshActiveAsync().ConfigureAwait(true);
+        PresetsChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     public async Task ReloadAsync()
     {
@@ -137,7 +174,8 @@ public sealed partial class PresetsPageViewModel : ObservableObject
         var vm = new PresetViewModel(preset)
         {
             ApplyCommand = ApplyCommand,
-            DeleteCommand = DeleteCommand
+            DeleteCommand = DeleteCommand,
+            EditCommand = EditCommand
         };
         return vm;
     }

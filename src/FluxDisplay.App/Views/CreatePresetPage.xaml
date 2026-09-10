@@ -74,6 +74,11 @@
                 </ItemsRepeater>
 
                 <StackPanel Spacing="12" Visibility="{Binding CurrentStep, Converter={StaticResource StepTwoConverter}}">
+                    <Border
+                        Style="{StaticResource FluxCardBorderStyle}"
+                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock TextWrapping="Wrap"><Run Text="✎ Editing '" /><Run Text="{Binding PresetName}" FontWeight="SemiBold" /><Run Text="'" /></TextBlock>
+                    </Border>
                     <TextBox Header="Preset name" Text="{Binding PresetName, Mode=TwoWay}" MaxLength="80" />
                     <Border Style="{StaticResource FluxCardBorderStyle}">
                         <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" />
@@ -87,7 +92,7 @@
             <Button Content="Back" Command="{Binding BackCommand}" />
             <Button Content="Next" Command="{Binding NextCommand}" IsEnabled="{Binding CanGoNext}" />
             <Button
-                Content="Create preset"
+                Content="{Binding SaveButtonText}"
                 Style="{StaticResource AccentButtonStyle}"
                 Command="{Binding CreateCommand}"
                 IsEnabled="{Binding CanCreate}"

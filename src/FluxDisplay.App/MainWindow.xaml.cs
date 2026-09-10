@@ -91,13 +91,14 @@ public sealed partial class MainWindow : Window
         {
             "settings" => new SettingsPage { DataContext = ViewModel.SettingsViewModel },
             "create" => new CreatePresetPage { DataContext = ViewModel.Create },
+            "edit" => new CreatePresetPage { DataContext = ViewModel.Create },
             _ => new PresetsPage { DataContext = ViewModel.Presets }
         };
         Helpers.AppLog.Info($"MainWindow.Navigate content set tag={tag}");
 
         foreach (var menu in NavView.MenuItems.OfType<NavigationViewItem>())
         {
-            menu.IsSelected = string.Equals(menu.Tag as string, tag is "create" ? "presets" : tag, StringComparison.Ordinal);
+            menu.IsSelected = string.Equals(menu.Tag as string, tag is "create" or "edit" ? "presets" : tag, StringComparison.Ordinal);
         }
 
         if (tag == "settings")
