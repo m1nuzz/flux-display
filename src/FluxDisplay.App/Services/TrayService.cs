@@ -1,4 +1,5 @@
 #pragma warning disable CS0618, CS0219
+using System.Reflection;
 using FluxDisplay.App.Controls;
 using FluxDisplay.App.Helpers;
 using FluxDisplay.App.Models;
@@ -60,6 +61,63 @@ public sealed class TrayService : ITrayService
 
         RebuildMenu();
         _taskbarIcon.ForceCreate();
+        LogMenuHostLiveness("init");
+        StartMenuHostWatchdog();
+    }
+
+    private bool? _lastMenuHostAlive;
+
+    // DIAGNOSTIC (temporary): the library's hidden SecondWindow host sometimes
+    // dies (Invalid window handle on right-click). Poll its HWND liveness via
+    // reflection + IsWindow and log transitions, so the log shows WHEN it dies.
+    private void LogMenuHostLiveness(string why)
+    {
+        try
+        {
+            nint handle = 0;
+            // NOTE: auto-property in 2.3.0, not a field — GetField silently misses it.
+            var prop = typeof(TaskbarIcon).GetProperty(
+                "ContextMenuWindowHandle", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (_taskbarIcon is not null && prop?.GetValue(_taskbarIcon) is nint h)
+            {
+                handle = h;
+            }
+
+            var alive = handle != 0 && IsWindow(handle);
+            if (_lastMenuHostAlive is null || _lastMenuHostAlive != alive)
+            {
+                Helpers.AppLog.Info($"menu-host {why} hwnd=0x{handle:X} alive={alive}");
+                _lastMenuHostAlive = alive;
+            }
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "menu-host probe");
+        }
+    }
+
+    private void StartMenuHostWatchdog()
+    {
+        AsyncHelper.FireAndForget(async () =>
+        {
+            try
+            {
+                using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+                while (await timer.WaitForNextTickAsync().ConfigureAwait(false))
+                {
+                    if (_taskbarIcon is null)
+                    {
+                        return;
+                    }
+
+                    LogMenuHostLiveness("poll");
+                }
+            }
+            catch (Exception ex)
+            {
+                Helpers.AppLog.Error(ex, "menu-host watchdog");
+            }
+        });
     }
 
     public void UpdatePresets(IReadOnlyList<Preset> presets, Guid? activePresetId)
@@ -118,6 +176,7 @@ public sealed class TrayService : ITrayService
     private void OnTrayLeftMouseUp()
     {
         Helpers.AppLog.Info("TrayService.OnTrayLeftMouseUp");
+        LogMenuHostLiveness("left-click");
         try
         {
             var window = App.MainWindow;
@@ -461,6 +520,9 @@ public sealed class TrayService : ITrayService
             _taskbarIcon = null;
         }
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsWindow(IntPtr hWnd);
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);

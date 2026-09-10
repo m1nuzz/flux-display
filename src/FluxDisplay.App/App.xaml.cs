@@ -26,6 +26,32 @@ public partial class App : Application
     // not fire for a true native fault, but the log still shows the last
     // managed scope before death. FirstChanceException is filtered to our own
     // frames to avoid flooding the log with handled framework exceptions.
+    // True only for the known tray-menu host death: Win32 ERROR_INVALID_WINDOW_HANDLE
+    // surfacing from H.NotifyIcon's ShowContextMenuInSecondWindowMode. Anything
+    // else still crashes (loudly, by design).
+    private static bool IsDeadMenuHostFailure(Exception ex)
+    {
+        try
+        {
+            if (ex is not System.Runtime.InteropServices.COMException com)
+            {
+                return false;
+            }
+
+            if (com.HResult != unchecked((int)0x80070578))
+            {
+                return false;
+            }
+
+            var stack = ex.StackTrace ?? string.Empty;
+            return stack.Contains("ShowContextMenuInSecondWindowMode", StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void AttachCrashLogging()
     {
         try
@@ -35,6 +61,16 @@ public partial class App : Application
                 try
                 {
                     AppLog.Error(e.Exception, "App.UnhandledException");
+                    // TEMPORARY safety net (tray-menu Invalid-handle crash): swallow
+                    // ONLY this exact failure — a dead SecondWindow host handle in
+                    // H.NotifyIcon's own right-click path. The click is lost but the
+                    // process survives; the liveness probe in TrayService records it.
+                    // Remove once the host-window lifetime is understood/fixed.
+                    if (IsDeadMenuHostFailure(e.Exception))
+                    {
+                        AppLog.Error("Swallowed dead menu-host MoveAndResize (temporary net)");
+                        e.Handled = true;
+                    }
                 }
                 catch
                 {
