@@ -139,9 +139,14 @@ jobs:
           4. The application is currently an unpackaged desktop build; no installer is required.
           '@ | Set-Content ./artifacts/FluxDisplay-win-x64/README.txt
 
-      - name: Create portable ZIP
+      - name: Stage portable folder
         shell: pwsh
-        run: Compress-Archive -Path ./artifacts/FluxDisplay-win-x64/* -DestinationPath ./artifacts/FluxDisplay-win-x64-portable.zip -Force
+        run: |
+          $dist = Join-Path $PWD 'artifacts/dist'
+          if (Test-Path -LiteralPath $dist) { Remove-Item -LiteralPath $dist -Recurse -Force }
+          $target = Join-Path $dist 'Flux Display'
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          Copy-Item -Path './artifacts/FluxDisplay-win-x64/*' -Destination $target -Recurse -Force -ErrorAction Stop
 
       - name: Build MSIX package (single-project MSIX)
         shell: pwsh
@@ -204,7 +209,7 @@ jobs:
           $pfxPath = Join-Path $PWD 'GitHubActionsWorkflow.pfx'
           if (Test-Path $pfxPath) { Remove-Item -LiteralPath $pfxPath -Force -ErrorAction SilentlyContinue }
 
-      - name: Create installer ZIP and install instructions
+      - name: Write installer instructions
         shell: pwsh
         run: |
           @'
@@ -214,30 +219,39 @@ jobs:
              - Double-click the .cer -> Install Certificate -> Local Machine -> Place all certificates in Trusted People.
           2. Double-click `FluxDisplay-win-x64-installer.msix` and choose Install.
           3. The certificate is for CI/testing only and is not a commercial publisher certificate.
-          4. Portable version is also available: FluxDisplay-win-x64-portable.zip (no install required).
+          4. Portable version is also available (FluxDisplay-win-x64-portable artifact, no install required).
           '@ | Set-Content ./artifacts/INSTALL-MSIX.txt
-          Compress-Archive -Path ./artifacts/FluxDisplay-win-x64-installer.msix,./artifacts/FluxDisplay-ci-signing.cer,./artifacts/INSTALL-MSIX.txt -DestinationPath ./artifacts/FluxDisplay-win-x64-installer.zip -Force
 
       - name: Write SHA256 checksums
         shell: pwsh
         run: |
-          $files = @(
-            './artifacts/FluxDisplay-win-x64-portable.zip',
-            './artifacts/FluxDisplay-win-x64-installer.zip'
-          )
-          foreach ($f in $files) {
-            $h = Get-FileHash -LiteralPath $f -Algorithm SHA256 -ErrorAction Stop
-            $line = "$($h.Hash.ToLowerInvariant())  $(Split-Path $f -Leaf)"
-            Set-Content -LiteralPath "$f.sha256" -Value ($line + "`n") -NoNewline -Encoding utf8NoBOM -ErrorAction Stop
+          # Portable: hash every staged file, paths relative to artifacts/dist.
+          # The sums file itself lives outside the hashed tree (dist root).
+          $distRoot = Join-Path $PWD 'artifacts/dist'
+          $portableLines = Get-ChildItem -LiteralPath (Join-Path $distRoot 'Flux Display') -Recurse -File -ErrorAction Stop | ForEach-Object {
+            $h = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256 -ErrorAction Stop
+            $rel = $_.FullName.Substring($distRoot.Length + 1).Replace('\', '/')
+            "$($h.Hash.ToLowerInvariant())  $rel"
           }
+          if (-not $portableLines) { throw 'No staged portable files found for checksums.' }
+          Set-Content -LiteralPath (Join-Path $distRoot 'SHA256SUMS.txt') -Value (($portableLines -join "`n") + "`n") -NoNewline -Encoding utf8NoBOM -ErrorAction Stop
+          # Installer: three loose files next to the build outputs.
+          $installerFiles = @(
+            './artifacts/FluxDisplay-win-x64-installer.msix',
+            './artifacts/FluxDisplay-ci-signing.cer',
+            './artifacts/INSTALL-MSIX.txt'
+          )
+          $installerLines = foreach ($f in $installerFiles) {
+            $h = Get-FileHash -LiteralPath $f -Algorithm SHA256 -ErrorAction Stop
+            "$($h.Hash.ToLowerInvariant())  $(Split-Path $f -Leaf)"
+          }
+          Set-Content -LiteralPath './artifacts/FluxDisplay-win-x64-installer.sha256' -Value (($installerLines -join "`n") + "`n") -NoNewline -Encoding utf8NoBOM -ErrorAction Stop
 
       - name: Upload portable artifact
         uses: actions/upload-artifact@v4
         with:
           name: FluxDisplay-win-x64-portable
-          path: |
-            ./artifacts/FluxDisplay-win-x64-portable.zip
-            ./artifacts/FluxDisplay-win-x64-portable.zip.sha256
+          path: ./artifacts/dist
           if-no-files-found: error
           retention-days: 14
 
@@ -246,7 +260,9 @@ jobs:
         with:
           name: FluxDisplay-win-x64-installer
           path: |
-            ./artifacts/FluxDisplay-win-x64-installer.zip
-            ./artifacts/FluxDisplay-win-x64-installer.zip.sha256
+            ./artifacts/FluxDisplay-win-x64-installer.msix
+            ./artifacts/FluxDisplay-ci-signing.cer
+            ./artifacts/INSTALL-MSIX.txt
+            ./artifacts/FluxDisplay-win-x64-installer.sha256
           if-no-files-found: error
           retention-days: 14
