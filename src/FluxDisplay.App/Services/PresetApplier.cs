@@ -2,8 +2,6 @@ using FluxDisplay.App.Models;
 
 namespace FluxDisplay.App.Services;
 
-// Applies a preset to the system: resolves display, changes mode, persists LastAppliedAt,
-// shows notifications or error dialogs. Also checks if a preset is currently active.
 public sealed class PresetApplier : IPresetApplier
 {
     private readonly IDisplayService _displayService;
@@ -23,7 +21,6 @@ public sealed class PresetApplier : IPresetApplier
         _trayService = trayService;
     }
 
-    // Compatibility constructor for legacy single-dependency usage (Core-style).
     public PresetApplier(IDisplayService displayService)
         : this(displayService,
                new PresetRepository(),
@@ -35,75 +32,72 @@ public sealed class PresetApplier : IPresetApplier
     public async Task<bool> ApplyAsync(Preset preset, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(preset);
-        using var _ = Helpers.AppLog.Scope("PresetApplier.ApplyAsync", $"'{preset.Name}' {preset.Mode.Width}x{preset.Mode.Height}@{preset.Mode.RefreshRate}");
+        var targets = preset.GetTargets();
+        using var _ = Helpers.AppLog.Scope("PresetApplier.ApplyAsync", $"'{preset.Name}' targets={targets.Count}");
 
-        // Resolve display by DevicePath.
-        var display = await _displayService.GetDisplayByDevicePathAsync(preset.DevicePath, ct).ConfigureAwait(false);
-        if (display is null)
+        foreach (var target in targets)
         {
-            await _dialogService.ShowErrorAsync("Display not found", $"Display '{preset.FriendlyMonitorName}' not found.").ConfigureAwait(false);
+            var display = await _displayService.GetDisplayByDevicePathAsync(target.DevicePath, ct).ConfigureAwait(false);
+            if (display is null)
+            {
+                await _dialogService.ShowErrorAsync("Display not found", $"Display '{target.FriendlyMonitorName}' not found.").ConfigureAwait(false);
+                return false;
+            }
+
+            var result = await _displayService.ChangeDisplayModeAsync(display.DisplayName, target.Mode, ct).ConfigureAwait(false);
+            if (result == DISP_CHANGE.Success)
+                continue;
+
+            if (result == DISP_CHANGE.BadMode)
+            {
+                await _dialogService.ShowErrorAsync("Mode unavailable", "Режим недоступен").ConfigureAwait(false);
+                return false;
+            }
+
+            await _dialogService.ShowErrorAsync("Failed to apply preset", $"Failed to apply '{preset.Name}' to '{target.FriendlyMonitorName}'. Error: {result}").ConfigureAwait(false);
             return false;
         }
 
-        // Attempt to change display mode.
-        var result = await _displayService.ChangeDisplayModeAsync(display.DisplayName, preset.Mode, ct).ConfigureAwait(false);
-
-        if (result == DISP_CHANGE.Success)
+        preset.LastAppliedAt = DateTime.UtcNow;
+        try
         {
-            // Update last applied timestamp and persist.
-            preset.LastAppliedAt = DateTime.UtcNow;
-            try
-            {
-                var collection = await _presetRepository.LoadAsync(ct).ConfigureAwait(false);
-                var existing = collection.Presets.FirstOrDefault(p => p.Id == preset.Id);
-                if (existing is not null)
-                {
-                    existing.LastAppliedAt = preset.LastAppliedAt;
-                }
-                else
-                {
-                    // If preset not yet in collection, add it.
-                    collection.Presets.Add(preset);
-                }
+            var collection = await _presetRepository.LoadAsync(ct).ConfigureAwait(false);
+            var existing = collection.Presets.FirstOrDefault(p => p.Id == preset.Id);
+            if (existing is not null)
+                existing.LastAppliedAt = preset.LastAppliedAt;
+            else
+                collection.Presets.Add(preset);
 
-                await _presetRepository.SaveAsync(collection, ct).ConfigureAwait(false);
-            }
-            catch
-            {
-                // Persistence failure should not hide successful mode change.
-            }
-
-            _trayService.ShowNotification("Preset applied", $"'{preset.Name}' applied successfully.");
-            return true;
+            await _presetRepository.SaveAsync(collection, ct).ConfigureAwait(false);
+        }
+        catch
+        {
         }
 
-        if (result == DISP_CHANGE.BadMode)
-        {
-            await _dialogService.ShowErrorAsync("Mode unavailable", "Режим недоступен").ConfigureAwait(false);
-            return false;
-        }
-
-        // Generic failure.
-        await _dialogService.ShowErrorAsync("Failed to apply preset", $"Failed to apply preset '{preset.Name}'. Error: {result}").ConfigureAwait(false);
-        return false;
+        _trayService.ShowNotification("Preset applied", $"'{preset.Name}' applied successfully.");
+        return true;
     }
 
     public async Task<bool> IsPresetActiveAsync(Preset preset, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(preset);
 
-        var display = await _displayService.GetDisplayByDevicePathAsync(preset.DevicePath, ct).ConfigureAwait(false);
-        if (display is null)
+        foreach (var target in preset.GetTargets())
         {
-            return false;
+            var display = await _displayService.GetDisplayByDevicePathAsync(target.DevicePath, ct).ConfigureAwait(false);
+            if (display is null)
+                return false;
+
+            var current = await _displayService.GetCurrentModeAsync(display.DisplayName, ct).ConfigureAwait(false);
+            if (current.Width != target.Mode.Width
+                || current.Height != target.Mode.Height
+                || current.RefreshRate != target.Mode.RefreshRate
+                || current.BitsPerPel != target.Mode.BitsPerPel)
+            {
+                return false;
+            }
         }
 
-        var current = await _displayService.GetCurrentModeAsync(display.DisplayName, ct).ConfigureAwait(false);
-
-        // Compare current mode with preset mode.
-        return current.Width == preset.Mode.Width
-            && current.Height == preset.Mode.Height
-            && current.RefreshRate == preset.Mode.RefreshRate
-            && current.BitsPerPel == preset.Mode.BitsPerPel;
+        return preset.GetTargets().Count > 0;
     }
 }

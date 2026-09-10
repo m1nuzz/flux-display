@@ -8,13 +8,13 @@ public sealed class PresetCardModel
 
     public string Name => Preset.Name;
     public Guid Id => Preset.Id;
-    public string MonitorName => Preset.FriendlyMonitorName;
-    public DisplayMode Mode => Preset.Mode;
-    public int ScalePercent => Preset.ScalePercent;
+    public string MonitorName => string.Join(" · ", Preset.GetTargets().Select(t => t.FriendlyMonitorName));
+    public DisplayMode Mode => Preset.GetTargets()[0].Mode;
+    public int ScalePercent => Preset.GetTargets()[0].ScalePercent;
 
-    public string ResolutionText => $"{Mode.Width} × {Mode.Height}";
-    public string RefreshText => $"{Mode.RefreshRate} Hz";
-    public string ScaleText => $"{ScalePercent}%";
+    public string ResolutionText => string.Join(" · ", Preset.GetTargets().Select(t => $"{t.Mode.Width} × {t.Mode.Height}"));
+    public string RefreshText => string.Join(" · ", Preset.GetTargets().Select(t => $"{t.Mode.RefreshRate} Hz"));
+    public string ScaleText => string.Join(" · ", Preset.GetTargets().Select(t => $"{t.ScalePercent}%"));
     public string BitsText => $"{Mode.BitsPerPel} bit";
-    public string ModeText => Mode.ToString();
+    public string ModeText => string.Join(" · ", Preset.GetTargets().Select(t => t.Mode.ToString()));
 }

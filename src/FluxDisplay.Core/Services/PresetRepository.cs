@@ -37,8 +37,8 @@ public sealed class PresetRepository : IPresetRepository
                 return new PresetCollection();
 
             await using var stream = File.OpenRead(StoragePath);
-            return await JsonSerializer.DeserializeAsync<PresetCollection>(stream, _options).ConfigureAwait(false)
-                ?? new PresetCollection();
+            var collection = await JsonSerializer.DeserializeAsync<PresetCollection>(stream, _options).ConfigureAwait(false);
+            return PresetMigrator.Normalize(collection);
         }
         catch (JsonException)
         {
@@ -57,6 +57,7 @@ public sealed class PresetRepository : IPresetRepository
     public async Task SaveAsync(PresetCollection collection)
     {
         ArgumentNullException.ThrowIfNull(collection);
+        PresetMigrator.Normalize(collection);
         var directory = Path.GetDirectoryName(StoragePath);
         if (string.IsNullOrWhiteSpace(directory))
             throw new InvalidOperationException("Storage path must include a directory.");

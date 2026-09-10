@@ -39,7 +39,7 @@ public sealed class PresetRepository : IPresetRepository
 
             await using var stream = File.OpenRead(StoragePath);
             var collection = await JsonSerializer.DeserializeAsync<PresetCollection>(stream, _options, ct).ConfigureAwait(false);
-            return collection ?? new PresetCollection();
+            return PresetMigrator.Normalize(collection);
         }
         catch (JsonException)
         {
@@ -67,6 +67,7 @@ public sealed class PresetRepository : IPresetRepository
     public async Task SaveAsync(PresetCollection collection, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(collection);
+        PresetMigrator.Normalize(collection);
         var directory = Path.GetDirectoryName(StoragePath);
         if (string.IsNullOrWhiteSpace(directory))
         {

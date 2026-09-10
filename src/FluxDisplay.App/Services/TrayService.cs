@@ -314,13 +314,22 @@ public sealed class TrayService : ITrayService
 
     private string FormatMenuSubtitle(Preset preset)
     {
-        var number = ResolveMonitorNumber(preset);
-        return $"Monitor {number} \u00B7 {preset.Mode.RefreshRate} Hz";
+        var targets = preset.GetTargets();
+        var numbers = targets.Select(ResolveMonitorNumber).ToList();
+        var rates = targets.Select(t => t.Mode.RefreshRate).ToList();
+        if (targets.Count <= 1)
+        {
+            var number = numbers.FirstOrDefault(1);
+            var rate = rates.FirstOrDefault();
+            return $"Monitor {number} \u00B7 {rate} Hz";
+        }
+
+        return $"Monitors {string.Join("+", numbers)} \u00B7 {string.Join("/", rates)} Hz";
     }
 
-    private int ResolveMonitorNumber(Preset preset)
+    private int ResolveMonitorNumber(PresetTarget target)
     {
-        if (_displayNumbers.TryGetValue(preset.DevicePath, out var number))
+        if (_displayNumbers.TryGetValue(target.DevicePath, out var number))
         {
             return number;
         }

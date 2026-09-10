@@ -9,15 +9,16 @@ public sealed partial class PresetViewModel : ObservableObject
     public PresetViewModel(Preset preset)
     {
         Preset = preset;
+        Preset.EnsureTargets();
     }
 
     public Preset Preset { get; }
 
     public Guid Id => Preset.Id;
     public string Name => Preset.Name;
-    public string MonitorName => Preset.FriendlyMonitorName;
-    public string ModeText => Preset.Mode.ToString();
-    public string ScaleText => $"{Preset.ScalePercent}%";
+    public string MonitorName => string.Join(" · ", Preset.GetTargets().Select(t => t.FriendlyMonitorName));
+    public string ModeText => string.Join(" · ", Preset.GetTargets().Select(t => t.Mode.ToString()));
+    public string ScaleText => string.Join(" · ", Preset.GetTargets().Select(t => $"{t.ScalePercent}%"));
 
     [ObservableProperty]
     private bool _isActive;

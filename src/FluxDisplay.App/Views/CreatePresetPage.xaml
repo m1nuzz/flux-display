@@ -15,8 +15,9 @@
 
         <ScrollViewer Grid.Row="1">
             <StackPanel Spacing="16">
-                <StackPanel Visibility="{Binding CurrentStep, Converter={StaticResource StepZeroConverter}}">
+                <StackPanel Spacing="8" Visibility="{Binding CurrentStep, Converter={StaticResource StepZeroConverter}}">
                     <HyperlinkButton Content="Identify displays" Command="{Binding IdentifyCommand}" />
+                    <TextBlock Text="Select one or more monitors." Style="{StaticResource FluxMutedTextStyle}" />
                     <ItemsRepeater ItemsSource="{Binding Monitors}">
                         <ItemsRepeater.Layout>
                             <UniformGridLayout MinItemWidth="280" MinItemHeight="140" MinColumnSpacing="12" MinRowSpacing="12" />
@@ -36,24 +37,41 @@
                     </ItemsRepeater>
                 </StackPanel>
 
-                <StackPanel Spacing="12" Visibility="{Binding CurrentStep, Converter={StaticResource StepOneConverter}}">
-                    <ComboBox
-                        Header="Resolution"
-                        MinWidth="280"
-                        ItemsSource="{Binding Resolutions}"
-                        SelectedItem="{Binding SelectedResolution, Mode=TwoWay}" />
-                    <ComboBox
-                        Header="Refresh rate"
-                        MinWidth="280"
-                        ItemsSource="{Binding RefreshRates}"
-                        SelectedItem="{Binding SelectedRefreshRate, Mode=TwoWay}" />
-                    <ComboBox
-                        Header="Scaling"
-                        MinWidth="280"
-                        ItemsSource="{Binding ScaleOptions}"
-                        SelectedItem="{Binding ScalePercent, Mode=TwoWay}" />
-                    <TextBox Header="DPI" IsReadOnly="True" Text="{Binding CurrentDpi}" />
-                </StackPanel>
+                <ItemsRepeater
+                    ItemsSource="{Binding TargetDrafts}"
+                    Visibility="{Binding CurrentStep, Converter={StaticResource StepOneConverter}}">
+                    <ItemsRepeater.Layout>
+                        <StackLayout Spacing="12" />
+                    </ItemsRepeater.Layout>
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate x:DataType="models:MonitorSettingsDraft">
+                            <Border Style="{StaticResource FluxCardBorderStyle}">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <ComboBox
+                                        Header="Resolution"
+                                        MinWidth="280"
+                                        HorizontalAlignment="Left"
+                                        ItemsSource="{Binding Resolutions}"
+                                        SelectedItem="{Binding SelectedResolution, Mode=TwoWay}" />
+                                    <ComboBox
+                                        Header="Refresh rate"
+                                        MinWidth="280"
+                                        HorizontalAlignment="Left"
+                                        ItemsSource="{Binding RefreshRates}"
+                                        SelectedItem="{Binding SelectedRefreshRate, Mode=TwoWay}" />
+                                    <ComboBox
+                                        Header="Scaling"
+                                        MinWidth="280"
+                                        HorizontalAlignment="Left"
+                                        ItemsSource="{Binding ScaleOptions}"
+                                        SelectedItem="{Binding ScalePercent, Mode=TwoWay}" />
+                                    <TextBox Header="DPI" IsReadOnly="True" MinWidth="280" Text="{Binding CurrentDpi}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
 
                 <StackPanel Spacing="12" Visibility="{Binding CurrentStep, Converter={StaticResource StepTwoConverter}}">
                     <TextBox Header="Preset name" Text="{Binding PresetName, Mode=TwoWay}" MaxLength="80" />

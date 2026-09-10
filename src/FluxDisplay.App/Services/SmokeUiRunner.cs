@@ -160,7 +160,17 @@ internal static class SmokeUiRunner
                     DevicePath = path,
                     FriendlyMonitorName = name,
                     Mode = new DisplayMode { Width = 1920, Height = 1080, RefreshRate = 240, BitsPerPel = 32 },
-                    ScalePercent = 100
+                    ScalePercent = 100,
+                    Targets =
+                    [
+                        new PresetTarget
+                        {
+                            DevicePath = path,
+                            FriendlyMonitorName = name,
+                            Mode = new DisplayMode { Width = 1920, Height = 1080, RefreshRate = 240, BitsPerPel = 32 },
+                            ScalePercent = 100
+                        }
+                    ]
                 },
                 new Preset
                 {
@@ -168,7 +178,17 @@ internal static class SmokeUiRunner
                     DevicePath = path,
                     FriendlyMonitorName = name,
                     Mode = new DisplayMode { Width = 1920, Height = 1080, RefreshRate = 60, BitsPerPel = 32 },
-                    ScalePercent = 100
+                    ScalePercent = 100,
+                    Targets =
+                    [
+                        new PresetTarget
+                        {
+                            DevicePath = path,
+                            FriendlyMonitorName = name,
+                            Mode = new DisplayMode { Width = 1920, Height = 1080, RefreshRate = 60, BitsPerPel = 32 },
+                            ScalePercent = 100
+                        }
+                    ]
                 }
             ]
         };

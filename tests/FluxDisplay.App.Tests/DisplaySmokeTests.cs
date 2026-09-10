@@ -79,7 +79,7 @@ public sealed class DisplaySmokeTests
     public void CreatePresetViewModel_uses_adapter_name_for_modes()
     {
         var text = ReadRepoFile("src/FluxDisplay.App/ViewModels/CreatePresetViewModel.cs");
-        Assert.Contains("GetSupportedModesAsync(SelectedMonitor.DisplayName)", text);
+        Assert.Contains("GetSupportedModesAsync(monitor.DisplayName)", text);
     }
 
     [Fact]

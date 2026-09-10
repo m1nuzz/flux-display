@@ -1,4 +1,4 @@
-namespace FluxDisplay.App.Models;
+namespace FluxDisplay.Core.Models;
 
 public sealed class PresetCollection
 {

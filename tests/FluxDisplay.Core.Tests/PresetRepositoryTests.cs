@@ -34,6 +34,8 @@ public sealed class PresetRepositoryTests
         var preset = Assert.Single(loaded.Presets);
         Assert.Equal("Gaming 1080p", preset.Name);
         Assert.Equal(1920, preset.Mode.Width);
+        Assert.Equal(PresetCollection.CurrentVersion, loaded.Version);
+        Assert.Single(preset.Targets);
         Assert.True(File.Exists(path));
     }
 
@@ -46,7 +48,7 @@ public sealed class PresetRepositoryTests
         var loaded = await repository.LoadAsync();
 
         Assert.Empty(loaded.Presets);
-        Assert.Equal(1, loaded.Version);
+        Assert.Equal(PresetCollection.CurrentVersion, loaded.Version);
     }
 
     [Fact]
@@ -61,6 +63,38 @@ public sealed class PresetRepositoryTests
         var loaded = await repository.LoadAsync();
 
         Assert.Empty(loaded.Presets);
+    }
+
+    [Fact]
+    public async Task Version1_json_without_targets_is_migrated()
+    {
+        using var temporaryDirectory = new TemporaryDirectory();
+        var path = Path.Combine(temporaryDirectory.Path, "presets.json");
+        Directory.CreateDirectory(temporaryDirectory.Path);
+        await File.WriteAllTextAsync(path, """
+            {
+              "version": 1,
+              "presets": [
+                {
+                  "id": "11111111-1111-1111-1111-111111111111",
+                  "name": "Legacy",
+                  "devicePath": "device-1",
+                  "friendlyMonitorName": "Old Monitor",
+                  "mode": { "width": 1920, "height": 1080, "refreshRate": 60, "bitsPerPel": 32 },
+                  "scalePercent": 125
+                }
+              ]
+            }
+            """);
+
+        var loaded = await new PresetJsonRepository(path).LoadAsync();
+        var preset = Assert.Single(loaded.Presets);
+        Assert.Equal(2, loaded.Version);
+        var target = Assert.Single(preset.Targets);
+        Assert.Equal("device-1", target.DevicePath);
+        Assert.Equal("Old Monitor", target.FriendlyMonitorName);
+        Assert.Equal(1920, target.Mode.Width);
+        Assert.Equal(125, target.ScalePercent);
     }
 
     private sealed class TemporaryDirectory : IDisposable
