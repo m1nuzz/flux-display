@@ -20,7 +20,11 @@ public sealed partial class CreatePresetViewModel : ObservableObject
     }
 
     public ObservableCollection<MonitorOption> Monitors { get; }
-    public ObservableCollection<MonitorSettingsDraft> TargetDrafts { get; }
+    // Settable on purpose: replacing the instance instead of Clear()+refill.
+    // Clearing a bound collection resets ComboBox selections to null and the
+    // TwoWay write-back breaks the binding channel, so later sets are ignored
+    // by the UI (empty combos despite correct VM values).
+    [ObservableProperty] private ObservableCollection<MonitorSettingsDraft> _targetDrafts = [];
     public ObservableCollection<int> ScaleOptions { get; } = [100, 125, 150, 175, 200, 225, 250];
 
     [ObservableProperty] private int _currentStep;
@@ -67,7 +71,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
         CurrentStep = 0;
         PresetName = string.Empty;
         SelectedMonitor = null;
-        TargetDrafts.Clear();
+        TargetDrafts = [];
         await LoadMonitorsAsync().ConfigureAwait(true);
     }
 
@@ -81,7 +85,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
         CurrentStep = 0;
         PresetName = preset.Name;
         SelectedMonitor = null;
-        TargetDrafts.Clear();
+        TargetDrafts = [];
         await LoadMonitorsAsync().ConfigureAwait(true);
 
         // Match preset targets to live monitors; missing ones become
@@ -91,7 +95,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
         foreach (var target in targets)
         {
             var match = Monitors.FirstOrDefault(m =>
-                string.Equals(m.DevicePath, target.DevicePath, StringComparison.OrdinalIgnoreCase));
+                string.Equals(NormalizeDevicePath(m.DevicePath), NormalizeDevicePath(target.DevicePath), StringComparison.OrdinalIgnoreCase));
             if (match is null)
             {
                 match = new MonitorOption
@@ -114,39 +118,7 @@ public sealed partial class CreatePresetViewModel : ObservableObject
             match.IsSelected = true;
         }
 
-        await LoadModesAsync(SelectedMonitors().ToList()).ConfigureAwait(true);
-
-        // Force stored values into the drafts even when the live mode lists
-        // (or the fallback list for offline monitors) do not contain them.
-        foreach (var draft in TargetDrafts)
-        {
-            var target = targets.FirstOrDefault(t =>
-                string.Equals(t.DevicePath, draft.Monitor.DevicePath, StringComparison.OrdinalIgnoreCase));
-            if (target is null)
-            {
-                continue;
-            }
-
-            var resolution = $"{target.Mode.Width} × {target.Mode.Height}";
-            if (!draft.Resolutions.Contains(resolution))
-            {
-                draft.Resolutions.Add(resolution);
-            }
-
-            draft.SelectedResolution = resolution;
-            if (!draft.RefreshRates.Contains(target.Mode.RefreshRate))
-            {
-                draft.RefreshRates.Add(target.Mode.RefreshRate);
-            }
-
-            draft.SelectedRefreshRate = target.Mode.RefreshRate;
-            if (!draft.ScaleOptions.Contains(target.ScalePercent))
-            {
-                draft.ScaleOptions.Add(target.ScalePercent);
-            }
-
-            draft.ScalePercent = target.ScalePercent;
-        }
+        await LoadModesAsync(SelectedMonitors().ToList(), targets).ConfigureAwait(true);
 
         UpdateCanGoNext();
         UpdateSummary();
@@ -205,7 +177,16 @@ public sealed partial class CreatePresetViewModel : ObservableObject
         Helpers.AppLog.Info($"CreatePreset.NextAsync step={CurrentStep} count={selected.Count}");
         if (CurrentStep == 0 && selected.Count > 0)
         {
-            await LoadModesAsync(selected).ConfigureAwait(true);
+            if (!DraftsMatchSelection(selected))
+            {
+                Helpers.AppLog.Info("NextAsync rebuilding drafts (selection changed)");
+                await LoadModesAsync(selected).ConfigureAwait(true);
+            }
+            else
+            {
+                Helpers.AppLog.Info("NextAsync reusing drafts (selection unchanged)");
+            }
+
             CurrentStep = 1;
             return;
         }
@@ -289,10 +270,10 @@ public sealed partial class CreatePresetViewModel : ObservableObject
 
     private IEnumerable<MonitorOption> SelectedMonitors() => Monitors.Where(item => item.IsSelected);
 
-    private async Task LoadModesAsync(IReadOnlyList<MonitorOption> selected)
+    private async Task LoadModesAsync(IReadOnlyList<MonitorOption> selected, IReadOnlyList<PresetTarget>? presetTargets = null)
     {
         using var _ = Helpers.AppLog.Scope("CreatePreset.LoadModesAsync", $"count={selected.Count}");
-        TargetDrafts.Clear();
+        var fresh = new List<MonitorSettingsDraft>();
         foreach (var monitor in selected)
         {
             var draft = new MonitorSettingsDraft(monitor, ScaleOptions);
@@ -303,12 +284,59 @@ public sealed partial class CreatePresetViewModel : ObservableObject
             };
             var modes = await _services.Display.GetSupportedModesAsync(monitor.DisplayName).ConfigureAwait(true);
             draft.ApplyModes(modes);
-            TargetDrafts.Add(draft);
+            var stored = presetTargets?.FirstOrDefault(t =>
+                string.Equals(NormalizeDevicePath(t.DevicePath), NormalizeDevicePath(monitor.DevicePath), StringComparison.OrdinalIgnoreCase));
+            if (stored is not null)
+            {
+                ApplyStoredTarget(draft, stored);
+            }
+            else if (presetTargets is not null)
+            {
+                Helpers.AppLog.Warn($"LoadModesAsync NO MATCH for {monitor.DisplayName}");
+            }
+
+            fresh.Add(draft);
             Helpers.AppLog.Info($"LoadModesAsync {monitor.DisplayName} modes={modes.Count} res={draft.SelectedResolution} hz={draft.SelectedRefreshRate}");
         }
 
+        TargetDrafts = new ObservableCollection<MonitorSettingsDraft>(fresh);
         UpdateCanGoNext();
     }
+
+    // Force stored values into a draft BEFORE it enters the bound collection,
+    // even when the live mode lists do not contain them.
+    private static void ApplyStoredTarget(MonitorSettingsDraft draft, PresetTarget target)
+    {
+        Helpers.AppLog.Info($"ApplyStoredTarget {draft.Monitor.DisplayName} <- {target.Mode.Width}x{target.Mode.Height}@{target.Mode.RefreshRate}");
+        var resolution = $"{target.Mode.Width} × {target.Mode.Height}";
+        if (!draft.Resolutions.Contains(resolution))
+        {
+            draft.Resolutions.Add(resolution);
+        }
+
+        draft.SelectedResolution = resolution;
+        if (!draft.RefreshRates.Contains(target.Mode.RefreshRate))
+        {
+            draft.RefreshRates.Add(target.Mode.RefreshRate);
+        }
+
+        draft.SelectedRefreshRate = target.Mode.RefreshRate;
+        if (!draft.ScaleOptions.Contains(target.ScalePercent))
+        {
+            draft.ScaleOptions.Add(target.ScalePercent);
+        }
+
+        draft.ScalePercent = target.ScalePercent;
+    }
+
+    private static string NormalizeDevicePath(string? path) =>
+        (path ?? string.Empty).Trim().TrimEnd('\\');
+
+    // Rebuilding drafts wipes user tweaks (and replays the Clear() binding
+    // hazard), so Next reuses them when the selection did not change.
+    private bool DraftsMatchSelection(IReadOnlyList<MonitorOption> selected) =>
+        TargetDrafts.Count == selected.Count
+        && selected.All(m => TargetDrafts.Any(d => ReferenceEquals(d.Monitor, m)));
 
     private string BuildDefaultName()
     {

@@ -9,6 +9,9 @@ namespace FluxDisplay.App.Helpers;
 // Override with FLUX_LOG_DIR env var.
 public static class AppLog
 {
+    // Bump on every diagnosis cycle so the log proves WHICH build ran.
+    public const string BuildTag = "sel-guard-v1";
+
     private static readonly object _gate = new();
     private static string? _path;
     private static bool _headerWritten;
@@ -53,7 +56,7 @@ public static class AppLog
 
         _headerWritten = true;
         var sb = new StringBuilder();
-        sb.AppendLine($"===== run pid={Environment.ProcessId} {DateTime.Now:O} =====");
+        sb.AppendLine($"===== run pid={Environment.ProcessId} {DateTime.Now:O} build={BuildTag} =====");
         sb.AppendLine($"exe={Environment.ProcessPath}");
         sb.AppendLine($"os={Environment.OSVersion} x64={Environment.Is64BitProcess}");
         sb.AppendLine($"args={string.Join(" ", args)}");
@@ -86,6 +89,51 @@ public static class AppLog
     public static IDisposable Scope(string name, string? detail = null) => new LogScope(name, detail);
 
     public static void PInvoke(string api, string detail) => Write("PINVOKE", $"{api} {detail}");
+
+    // Who is writing a bound property right now: our own method (e.g. ApplyModes)
+    // or the XAML binding engine pushing a control state back (TwoWay write-back)?
+    // Compact caller chain, first meaningful frames only.
+    public static string WhoSet(int skip = 1)
+    {
+        try
+        {
+            var frames = new System.Diagnostics.StackTrace(skip + 1, false).GetFrames();
+            if (frames is null)
+            {
+                return "?";
+            }
+
+            var parts = new List<string>();
+            foreach (var frame in frames)
+            {
+                var method = frame.GetMethod();
+                var type = method?.DeclaringType;
+                var name = type?.Name;
+                if (method is null || name is null)
+                {
+                    continue;
+                }
+
+                if (name is "<>c" or "AppLog" or "MonitorSettingsDraft")
+                {
+                    continue;
+                }
+
+                var mname = method.Name.StartsWith("set_") ? "set" : method.Name;
+                parts.Add(name + "." + mname);
+                if (parts.Count >= 5)
+                {
+                    break;
+                }
+            }
+
+            return parts.Count > 0 ? string.Join("<", parts) : "?";
+        }
+        catch
+        {
+            return "?";
+        }
+    }
 
     // Native "Unknown Hard Error" can't be caught in managed code. A WER local
     // dump gives the faulting module + stack. Logs whether dumps are on, plus

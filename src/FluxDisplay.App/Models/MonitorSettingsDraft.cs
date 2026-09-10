@@ -13,6 +13,10 @@ public sealed partial class MonitorSettingsDraft : ObservableObject
     }
 
     public MonitorOption Monitor { get; }
+    // Get-only on purpose: this instance is never replaced after binding, only
+    // mutated in place. Combined with nullable TwoWay SelectedItem (null
+    // write-backs are legal, so the channel cannot fault) this is the shape
+    // proven working by the Scaling combo.
     public ObservableCollection<string> Resolutions { get; } = [];
     public ObservableCollection<int> RefreshRates { get; } = [];
     public ObservableCollection<int> ScaleOptions { get; } = [];
@@ -27,7 +31,58 @@ public sealed partial class MonitorSettingsDraft : ObservableObject
     public string Title => Monitor.DisplayTitle;
     public bool IsComplete => SelectedResolution is not null && (SelectedRefreshRate ?? 0) > 0;
 
-    partial void OnSelectedResolutionChanged(string? value) => RebuildRefreshRates();
+    private string? _lastResolution;
+    private int? _lastRefreshRate;
+
+    private static bool IsBindingPush() =>
+        Helpers.AppLog.WhoSet().Contains("ManagedCustomProperty", StringComparison.Ordinal);
+
+    partial void OnSelectedResolutionChanged(string? value)
+    {
+        Helpers.AppLog.Info($"SEL-RES -> '{value}' via {Helpers.AppLog.WhoSet()}");
+        if (string.IsNullOrEmpty(value))
+        {
+            // Spurious TwoWay write-back: the control pushes empty while its
+            // list is being (re)realized, clobbering the VM value set from code.
+            // Restore the last good value when it is still offered; genuine
+            // clears (empty list) and our own code paths pass through.
+            // The restore set is a no-op if equal, so this always terminates.
+            if (IsBindingPush()
+                && _lastResolution is not null
+                && Resolutions.Contains(_lastResolution))
+            {
+                Helpers.AppLog.Info($"SEL-RES restoring '{_lastResolution}'");
+                SelectedResolution = _lastResolution;
+                return;
+            }
+        }
+        else
+        {
+            _lastResolution = value;
+        }
+
+        RebuildRefreshRates();
+    }
+
+    partial void OnSelectedRefreshRateChanged(int? value)
+    {
+        Helpers.AppLog.Info($"SEL-HZ -> '{value}' via {Helpers.AppLog.WhoSet()}");
+        if (value is null)
+        {
+            if (IsBindingPush()
+                && _lastRefreshRate is int hz
+                && RefreshRates.Contains(hz))
+            {
+                Helpers.AppLog.Info($"SEL-HZ restoring '{hz}'");
+                SelectedRefreshRate = hz;
+                return;
+            }
+        }
+        else
+        {
+            _lastRefreshRate = value;
+        }
+    }
     partial void OnScalePercentChanged(int value) => CurrentDpi = (int)Math.Round(value * 96.0 / 100.0);
 
     public void ApplyModes(IReadOnlyList<DisplayMode> modes)
