@@ -218,15 +218,35 @@ jobs:
           '@ | Set-Content ./artifacts/INSTALL-MSIX.txt
           Compress-Archive -Path ./artifacts/FluxDisplay-win-x64-installer.msix,./artifacts/FluxDisplay-ci-signing.cer,./artifacts/INSTALL-MSIX.txt -DestinationPath ./artifacts/FluxDisplay-win-x64-installer.zip -Force
 
-      - name: Upload portable and installer artifacts
+      - name: Write SHA256 checksums
+        shell: pwsh
+        run: |
+          $files = @(
+            './artifacts/FluxDisplay-win-x64-portable.zip',
+            './artifacts/FluxDisplay-win-x64-installer.zip'
+          )
+          foreach ($f in $files) {
+            $h = Get-FileHash -LiteralPath $f -Algorithm SHA256 -ErrorAction Stop
+            $line = "$($h.Hash.ToLowerInvariant())  $(Split-Path $f -Leaf)"
+            Set-Content -LiteralPath "$f.sha256" -Value ($line + "`n") -NoNewline -Encoding utf8NoBOM -ErrorAction Stop
+          }
+
+      - name: Upload portable artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FluxDisplay-win-x64-distributions
+          name: FluxDisplay-win-x64-portable
           path: |
             ./artifacts/FluxDisplay-win-x64-portable.zip
+            ./artifacts/FluxDisplay-win-x64-portable.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FluxDisplay-win-x64-installer
+          path: |
             ./artifacts/FluxDisplay-win-x64-installer.zip
-            ./artifacts/FluxDisplay-win-x64-installer.msix
-            ./artifacts/FluxDisplay-ci-signing.cer
-            ./artifacts/INSTALL-MSIX.txt
+            ./artifacts/FluxDisplay-win-x64-installer.zip.sha256
           if-no-files-found: error
           retention-days: 14
