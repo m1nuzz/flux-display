@@ -59,6 +59,16 @@ public sealed class TrayService : ITrayService
         dblCmd.ExecuteRequested += (_, _) => OnTrayLeftMouseUp();
         _taskbarIcon.DoubleClickCommand = dblCmd;
 
+        // Runs synchronously on the tray-callback (UI) thread right BEFORE the
+        // library shows the SecondWindow menu on right-click. The library
+        // stomps Height/Padding on our items on every open (template no longer
+        // depends on item Padding) and its cached host handle/AppWindow can go
+        // stale (first click lost with 0x80070578). Resync them here so the
+        // very first open already measures and positions correctly.
+        var rightCmd = new Microsoft.UI.Xaml.Input.XamlUICommand();
+        rightCmd.ExecuteRequested += (_, _) => OnTrayRightMousePreShow();
+        _taskbarIcon.RightClickCommand = rightCmd;
+
         RebuildMenu();
         _taskbarIcon.ForceCreate();
         LogMenuHostLiveness("init");
@@ -169,11 +179,70 @@ public sealed class TrayService : ITrayService
         {
             await Task.Delay(800).ConfigureAwait(true);
             WarmUpNow();
+            await FireMenuHostLoadedAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
             Helpers.AppLog.Error(ex, "menu-warmup.delayed");
         }
+    }
+
+    // 2.3.0 fires frame.Loaded only on the host window's FIRST real ShowWindow
+    // — i.e. on the user's first right-click, where its ShowAt+Hide races the
+    // click's own Activated->ShowAt and the menu ends up closed (invisible
+    // first open, fine afterwards). Burn Loaded down here instead: show the
+    // (fully transparent) host once, let Loaded restyle + settle, hide again.
+    private async Task FireMenuHostLoadedAsync()
+    {
+        try
+        {
+            var handle = GetMenuHostHandle();
+            if (handle == 0 || !IsWindow(handle))
+            {
+                return;
+            }
+
+            _ = ShowWindow(handle, 1); // SW_SHOWNORMAL, no activation steal
+            await Task.Delay(400).ConfigureAwait(true);
+            if (IsWindow(handle))
+            {
+                _ = ShowWindow(handle, 0); // SW_HIDE
+            }
+
+            try
+            {
+                const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+                var flyout = typeof(TaskbarIcon).GetProperty("ContextMenuFlyout", flags)
+                    ?.GetValue(_taskbarIcon) as MenuFlyout;
+                flyout?.Hide();
+            }
+            catch
+            {
+            }
+
+            Helpers.AppLog.Info("menu-warmup host-loaded fired");
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "menu-warmup.host-loaded");
+        }
+    }
+
+    private nint GetMenuHostHandle()
+    {
+        try
+        {
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            if (typeof(TaskbarIcon).GetProperty("ContextMenuWindowHandle", flags)?.GetValue(_taskbarIcon) is nint h)
+            {
+                return h;
+            }
+        }
+        catch
+        {
+        }
+
+        return 0;
     }
 
     private void WarmUpNow()
@@ -208,12 +277,280 @@ public sealed class TrayService : ITrayService
             }
 
             flyout.ShowAt(hostContent);
+            // Same-tick ShowAt+Hide never runs layout, so the first real open
+            // still measures cold (narrow host -> scrollbar). Force a layout
+            // pass and run the library's own measure while hidden: host window
+            // stays invisible, but templates/fonts/DesiredSize get realized.
+            try
+            {
+                hostContent.UpdateLayout();
+            }
+            catch
+            {
+            }
+
+            WarmMeasureInternalFlyout();
             flyout.Hide();
+            HookInternalFlyoutEvents();
             Helpers.AppLog.Info("menu-warmup done");
         }
         catch (Exception ex)
         {
             Helpers.AppLog.Error(ex, "menu-warmup");
+        }
+    }
+
+    // Pre-show hook for right-click: refresh items in place (the library
+    // syncs these same objects into its internal flyout) and resync the
+    // hidden SecondWindow host if its cached handle/AppWindow went stale.
+    // Must never throw: an exception here would cancel the menu open.
+    private void OnTrayRightMousePreShow()
+    {
+        try
+        {
+            var queue = App.MainWindow?.DispatcherQueue;
+            if (queue is not null && !queue.HasThreadAccess)
+            {
+                Helpers.AppLog.Info("menu-host right-click: off-UI-thread, resync skipped");
+                return;
+            }
+
+            try
+            {
+                RefreshMenuItems();
+            }
+            catch
+            {
+            }
+
+            ResyncMenuHost("right-click");
+            PreShowHostWindow();
+            WarmMeasureInternalFlyout();
+            LogPreShowState();
+            EnqueuePostShowState();
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "tray-rightclick-preshow");
+        }
+    }
+
+    // 2.3.0 drops the show when the host goes hidden->shown+foreground in one
+    // stack (Activated->ShowAt never fires: invisible first open), but
+    // visible->foreground always works (that's why the second click is fine:
+    // the first one left the host shown). Pre-show the host without activation
+    // so the library's own ShowWindow+SetForegroundWindow takes the warm path.
+    // The host is fully transparent: nothing flashes.
+    private void PreShowHostWindow()
+    {
+        try
+        {
+            var h = GetMenuHostHandle();
+            if (h != 0 && IsWindow(h) && !IsWindowVisible(h))
+            {
+                _ = ShowWindow(h, 4); // SW_SHOWNA: show, no activation
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private void ResyncMenuHost(string why)
+    {
+        try
+        {
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            var t = typeof(TaskbarIcon);
+            var window = t.GetProperty("ContextMenuWindow", flags)?.GetValue(_taskbarIcon) as Window;
+            if (window is null)
+            {
+                Helpers.AppLog.Info($"menu-host {why}: no ContextMenuWindow");
+                return;
+            }
+
+            var liveHandle = WinRT.Interop.WindowNative.GetWindowHandle(window);
+            if (liveHandle == 0 || !IsWindow(liveHandle))
+            {
+                // Window object survived but its HWND is gone: Activate
+                // recreates it, then hide right away (repair path only).
+                try
+                {
+                    window.Activate();
+                    liveHandle = WinRT.Interop.WindowNative.GetWindowHandle(window);
+                    if (liveHandle != 0 && IsWindow(liveHandle))
+                    {
+                        _ = ShowWindow(liveHandle, 0);
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            var liveAlive = liveHandle != 0 && IsWindow(liveHandle);
+            var cached = t.GetProperty("ContextMenuWindowHandle", flags)?.GetValue(_taskbarIcon) as nint?;
+            if (liveAlive && cached != liveHandle)
+            {
+                t.GetProperty("ContextMenuWindowHandle", flags)?.SetValue(_taskbarIcon, liveHandle);
+                try
+                {
+                    var id = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(liveHandle);
+                    var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(id);
+                    t.GetProperty("ContextMenuAppWindow", flags)?.SetValue(_taskbarIcon, appWindow);
+                }
+                catch (Exception ex)
+                {
+                    Helpers.AppLog.Error(ex, "menu-host appwindow-resync");
+                }
+
+                Helpers.AppLog.Info($"menu-host {why} resynced hwnd=0x{liveHandle:X} (was 0x{cached:X})");
+            }
+            else if (_lastMenuHostAlive != liveAlive)
+            {
+                Helpers.AppLog.Info($"menu-host {why} hwnd=0x{liveHandle:X} alive={liveAlive}");
+                _lastMenuHostAlive = liveAlive;
+            }
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "menu-host resync");
+        }
+    }
+
+    // Runs the library's own private MeasureFlyout over its internal flyout:
+    // same Prepare(stomp)+Measure the show path does, but while hidden. Pure
+    // (no visual effect), best-effort, pinned to H.NotifyIcon 2.3.0.
+    private void WarmMeasureInternalFlyout()
+    {
+        try
+        {
+            const BindingFlags inst =
+                BindingFlags.NonPublic | BindingFlags.Instance;
+            const BindingFlags stat =
+                BindingFlags.NonPublic | BindingFlags.Static;
+            var t = typeof(TaskbarIcon);
+            var flyout = t.GetProperty("ContextMenuFlyout", inst)?.GetValue(_taskbarIcon) as MenuFlyout;
+            if (flyout is null)
+            {
+                return;
+            }
+
+            t.GetMethod("MeasureFlyout", stat)?.Invoke(
+                null, new object[] { flyout, new Windows.Foundation.Size(10000.0, 10000.0) });
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "menu-warm-measure");
+        }
+    }
+
+    private MenuFlyout? _hookedFlyout;
+
+    // Hook the library's internal flyout once: exact Opened/Closed timeline
+    // per click. Shows whether click 1 never opens or opens-then-closes.
+    private void HookInternalFlyoutEvents()
+    {
+        try
+        {
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            var flyout = typeof(TaskbarIcon).GetProperty("ContextMenuFlyout", flags)?.GetValue(_taskbarIcon) as MenuFlyout;
+            if (flyout is null || ReferenceEquals(flyout, _hookedFlyout))
+            {
+                return;
+            }
+
+            _hookedFlyout = flyout;
+            flyout.Opened += (_, _) => Helpers.AppLog.Info("menu-flyout opened");
+            flyout.Closed += (_, _) => Helpers.AppLog.Info("menu-flyout closed");
+
+            try
+            {
+                const BindingFlags flags2 = BindingFlags.NonPublic | BindingFlags.Instance;
+                var host = typeof(TaskbarIcon).GetProperty("ContextMenuWindow", flags2)?.GetValue(_taskbarIcon) as Window;
+                if (host is not null)
+                {
+                    host.Activated += (_, args) => Helpers.AppLog.Info($"menu-host activated state={args.WindowActivationState}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Helpers.AppLog.Error(ex, "menu-host-hook");
+            }
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "menu-flyout-hook");
+        }
+    }
+
+    // One mandatory line per right-click: internal flyout XamlRoot/scale,
+    // loaded flag, host handle. Tells cold first-open apart from warm ones.
+    private void LogPreShowState()
+    {
+        try
+        {
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            var t = typeof(TaskbarIcon);
+            var flyout = t.GetProperty("ContextMenuFlyout", flags)?.GetValue(_taskbarIcon) as MenuFlyout;
+            object? loaded = t.GetProperty("IsSecondWindowContextMenuLoaded", flags)?.GetValue(_taskbarIcon);
+            loaded ??= t.GetField("IsSecondWindowContextMenuLoaded", flags)?.GetValue(_taskbarIcon);
+            var cached = t.GetProperty("ContextMenuWindowHandle", flags)?.GetValue(_taskbarIcon) as nint?;
+            var scale = flyout?.XamlRoot?.RasterizationScale;
+            var open = flyout?.IsOpen;
+            Helpers.AppLog.Info(
+                $"menu-show click xamlroot={(scale is null ? "null" : scale.ToString())} loaded={loaded} isopen={open} hwnd=0x{cached:X}");
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "menu-show-state");
+        }
+    }
+
+    // Sampled ~600ms after the click: did the flyout actually open, is the
+    // host visible, and where is it. Discriminates "ShowAt never ran" from
+    // "opened then closed" from "opened off-screen".
+    private void EnqueuePostShowState()
+    {
+        try
+        {
+            App.MainWindow?.DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    await Task.Delay(600).ConfigureAwait(true);
+                    const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+                    var t = typeof(TaskbarIcon);
+                    var flyout = t.GetProperty("ContextMenuFlyout", flags)?.GetValue(_taskbarIcon) as MenuFlyout;
+                    var visible = t.GetProperty("IsContextMenuVisible", flags)?.GetValue(_taskbarIcon);
+                    var handle = GetMenuHostHandle();
+                    var shown = handle != 0 && IsWindowVisible(handle);
+                    string rect = "n/a";
+                    if (handle != 0)
+                    {
+                        try
+                        {
+                            if (GetWindowRect(handle, out var r))
+                            {
+                                rect = $"{r.left},{r.top},{r.right},{r.bottom}";
+                            }
+                        }
+                        catch
+                        {
+                        }
+                    }
+
+                    Helpers.AppLog.Info(
+                        $"menu-show +600ms isopen={flyout?.IsOpen} visibleflag={visible} winvisible={shown} rect={rect}");
+                }
+                catch (Exception ex)
+                {
+                    Helpers.AppLog.Error(ex, "menu-postshow-state");
+                }
+            });
+        }
+        catch
+        {
         }
     }
 
@@ -335,6 +672,7 @@ public sealed class TrayService : ITrayService
             presenterStyle.Setters.Add(new Setter(Control.CornerRadiusProperty, new CornerRadius(12)));
             presenterStyle.Setters.Add(new Setter(Control.BorderBrushProperty, new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0x1E, 0x3A, 0x5F))));
             presenterStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+            presenterStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 10, 12, 10)));
             flyout.MenuFlyoutPresenterStyle = presenterStyle;
         }
         catch
@@ -360,6 +698,10 @@ public sealed class TrayService : ITrayService
             var slot = new TrayPresetMenuItem
             {
                 MinWidth = MenuItemMinWidth,
+                // Base MenuFlyoutItem clamps rows to 32px; two-line content
+                // (~6+19+4+16+6=51) would overflow into neighbours. MinHeight
+                // wins in layout and fits the content exactly, no dead air.
+                MinHeight = 52,
                 Visibility = Visibility.Collapsed,
                 Icon = new FontIcon
                 {
@@ -604,6 +946,21 @@ public sealed class TrayService : ITrayService
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool IsWindow(IntPtr hWnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out WinRect lpRect);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct WinRect
+    {
+        public int left;
+        public int top;
+        public int right;
+        public int bottom;
+    }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
