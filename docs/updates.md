@@ -55,6 +55,25 @@ triggered with **Check now**. HTTP 404 on `/latest` (no stable release) is a nor
   folder if needed. Downgrade compatibility of settings is not guaranteed —
   verify before relying on it.
 
+## Fake end-to-end test (no real release needed)
+
+`GitHubReleaseChecker.LatestReleaseUrl` honors `FLUXDISPLAY_UPDATE_API_URL`:
+when set, the updater queries that URL instead of api.github.com. Procedure
+(verified 2026-09-11 against a stub serving tag `v9.9.9`):
+
+1. Build a marker "setup" (any exe that writes proof it ran + its args) and
+   compute its SHA-256.
+2. Serve `/repos/m1nuzz/flux-display/releases/latest` with the tag, a
+   strictly-named asset (`FluxDisplay-9.9.9-setup.exe`), its
+   `browser_download_url` and `digest: sha256:<hex>`, plus the asset bytes.
+3. Copy the app publish output to `%LocalAppData%\Programs\FluxDisplay`
+   (back up the real install first) so `IsInstalledCopy` is true.
+4. Launch the copy with the env var set. With `Automatic` mode the chain runs
+   silently ~15 s after start: check → strict asset match → digest verify →
+   download to unique `%TEMP%\FluxDisplay-setup-*.exe` → launch with the
+   silent flags → app exit. Proof = marker output + `Update installer started`
+   in the app log.
+
 ## Recovery
 
 If an update fails midway (network cut, disk full, hash mismatch): the partial

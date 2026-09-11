@@ -11,7 +11,15 @@ namespace FluxDisplay.Core.Updates;
 // match — 0 or 2+ is a controlled failure, never "the first .exe".
 public sealed partial class GitHubReleaseChecker : IUpdateSource
 {
-    public const string LatestReleaseUrl = "https://api.github.com/repos/m1nuzz/flux-display/releases/latest";
+    public const string DefaultLatestReleaseUrl = "https://api.github.com/repos/m1nuzz/flux-display/releases/latest";
+
+    // Test hook for fake end-to-end runs: point to a local stub serving the
+    // /latest shape. Never set in production; the URL is logged on use.
+    public static string LatestReleaseUrl =>
+        Environment.GetEnvironmentVariable("FLUXDISPLAY_UPDATE_API_URL") is { Length: > 0 } custom
+            ? custom
+            : DefaultLatestReleaseUrl;
+
     public static readonly TimeSpan HeaderTimeout = TimeSpan.FromSeconds(30);
 
     // Strict asset name; the captured version must equal the release tag.
