@@ -21,9 +21,28 @@
                 SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
                 DisplayMemberPath="Label" />
             <Border Style="{StaticResource FluxCardBorderStyle}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Updates" FontWeight="SemiBold" />
+                    <ComboBox
+                        Header="Check for updates"
+                        MinWidth="280"
+                        ItemsSource="{Binding UpdateModes}"
+                        SelectedItem="{Binding SelectedUpdateMode, Mode=TwoWay}"
+                        DisplayMemberPath="Label" />
+                    <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <Button Content="Check now" Command="{Binding CheckUpdatesCommand}" />
+                        <TextBlock
+                            Text="{Binding UpdateStatus}"
+                            Style="{StaticResource FluxMutedTextStyle}"
+                            VerticalAlignment="Center"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource FluxCardBorderStyle}">
                 <StackPanel Spacing="4">
                     <TextBlock Text="About" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding Version}" Style="{StaticResource FluxMutedTextStyle}" />
+                    <TextBlock Style="{StaticResource FluxMutedTextStyle}"><Run Text="Version " /><Run Text="{Binding Version}" /></TextBlock>
                     <HyperlinkButton Content="GitHub" NavigateUri="{Binding GitHubUri}" />
                 </StackPanel>
             </Border>

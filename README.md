@@ -61,6 +61,8 @@ dotnet test tests/FluxDisplay.Core.Tests/FluxDisplay.Core.Tests.csproj --configu
 
 CI (`.github/workflows/ci.yml`) runs Core tests on Ubuntu, then builds portable ZIP + EXE installer (Inno Setup) on Windows.
 
+Automatic updates from GitHub Releases are documented in [`docs/updates.md`](docs/updates.md).
+
 ## Usage
 
 1. Open the app and create a preset.

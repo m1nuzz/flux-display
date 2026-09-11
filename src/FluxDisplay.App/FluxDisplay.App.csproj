@@ -26,6 +26,9 @@
     <WarningsNotAsErrors>NU1603;CS0576;CS0219;MVVMTK0045</WarningsNotAsErrors>
     <NoWarn>$(NoWarn);NU1603;CS0576;CS0219;MVVMTK0045</NoWarn>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <!-- Default product version. CI overrides it from the git tag (vX.Y.Z) so
+         installed builds report the release version and the updater can compare. -->
+    <Version>1.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250205002" />

@@ -51,6 +51,14 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
+      - name: Resolve version from tag
+        shell: pwsh
+        run: |
+          $version = '1.0.0'
+          if ($env:GITHUB_REF -match '^refs/tags/v(\d+\.\d+\.\d+)$') { $version = $Matches[1] }
+          Add-Content -Path $env:GITHUB_ENV -Value "APP_VERSION=$version"
+          Write-Host "APP_VERSION=$version"
+
       - name: Restore solution
         run: msbuild FluxDisplay.sln /t:Restore /p:Configuration=Release /p:Platform=x64
         env:
@@ -80,7 +88,8 @@ jobs:
             -p:GenerateAppxPackageOnBuild=false `
             -p:PublishReadyToRun=false `
             -p:DebugType=None `
-            -p:DebugSymbols=false
+            -p:DebugSymbols=false `
+            -p:Version=$env:APP_VERSION
           $exitCode = $LASTEXITCODE
           if ($exitCode -ne 0) {
             Write-Host '--- XAML/compiler diagnostic files ---'
@@ -142,9 +151,25 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
           if (-not (Test-Path -LiteralPath $iscc)) { throw "ISCC.exe not found at $iscc" }
-          & $iscc installer/FluxDisplay.iss
+          & $iscc installer/FluxDisplay.iss /DMyAppVersion=$env:APP_VERSION
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Get-Item ./artifacts/FluxDisplay-win-x64-setup.exe | Format-Table Name, Length -AutoSize | Out-String -Width 200 | Write-Host
+          # Versioned asset name: the updater's strict matcher requires
+          # FluxDisplay-<X.Y.Z>-setup.exe with X.Y.Z equal to the release tag.
+          $versioned = "FluxDisplay-$env:APP_VERSION-setup.exe"
+          Rename-Item -LiteralPath ./artifacts/FluxDisplay-win-x64-setup.exe -NewName $versioned -ErrorAction Stop
+          Get-Item "./artifacts/$versioned" | Format-Table Name, Length -AutoSize | Out-String -Width 200 | Write-Host
+
+      - name: Verify version contract (assembly == tag == asset name)
+        shell: pwsh
+        run: |
+          $dll = './artifacts/FluxDisplay-win-x64/FluxDisplay.App.dll'
+          if (-not (Test-Path -LiteralPath $dll)) { throw "Published assembly not found at $dll" }
+          $assemblyVersion = [Reflection.AssemblyName]::GetAssemblyName((Join-Path $PWD $dll)).Version.ToString()
+          $expected = "$env:APP_VERSION.0"
+          if ($assemblyVersion -ne $expected) { throw "Assembly version $assemblyVersion != tag version $expected" }
+          $asset = "FluxDisplay-$env:APP_VERSION-setup.exe"
+          if (-not (Test-Path -LiteralPath "./artifacts/$asset")) { throw "Versioned setup asset missing: $asset" }
+          Write-Host "Version contract OK: assembly $assemblyVersion, asset $asset"
 
       - name: Write setup instructions
         shell: pwsh
@@ -152,7 +177,7 @@ jobs:
           @'
           # FluxDisplay setup (EXE installer, no certificate needed)
 
-          1. Run `FluxDisplay-win-x64-setup.exe` and follow the wizard.
+          1. Run `FluxDisplay-<version>-setup.exe` and follow the wizard.
           2. No admin rights required (installs into your LocalAppData).
           3. Windows SmartScreen may warn about an unknown publisher: choose "More info" -> "Run anyway".
              (Expected: the build is not code-signed with a commercial certificate.)
@@ -162,8 +187,12 @@ jobs:
       - name: Write setup checksum
         shell: pwsh
         run: |
-          $h = Get-FileHash -LiteralPath './artifacts/FluxDisplay-win-x64-setup.exe' -Algorithm SHA256 -ErrorAction Stop
-          Set-Content -LiteralPath './artifacts/FluxDisplay-win-x64-setup.sha256' -Value ("$($h.Hash.ToLowerInvariant())  FluxDisplay-win-x64-setup.exe`n") -NoNewline -Encoding utf8NoBOM -ErrorAction Stop
+          $asset = "FluxDisplay-$env:APP_VERSION-setup.exe"
+          $h = Get-FileHash -LiteralPath "./artifacts/$asset" -Algorithm SHA256 -ErrorAction Stop
+          $shaName = $asset -replace '\.exe$', '.sha256'
+          Set-Content -LiteralPath "./artifacts/$shaName" -Value ("$($h.Hash.ToLowerInvariant())  $asset`n") -NoNewline -Encoding utf8NoBOM -ErrorAction Stop
+          Add-Content -Path $env:GITHUB_ENV -Value "SETUP_ASSET=$asset"
+          Add-Content -Path $env:GITHUB_ENV -Value "SETUP_SHA=$shaName"
 
       - name: Write SHA256 checksums
         shell: pwsh
@@ -192,9 +221,9 @@ jobs:
         with:
           name: FluxDisplay-win-x64-installer
           path: |
-            ./artifacts/FluxDisplay-win-x64-setup.exe
+            ./artifacts/FluxDisplay-*-setup.exe
             ./artifacts/INSTALL-SETUP.txt
-            ./artifacts/FluxDisplay-win-x64-setup.sha256
+            ./artifacts/FluxDisplay-*-setup.sha256
           if-no-files-found: error
           retention-days: 14
 
@@ -204,6 +233,13 @@ jobs:
     needs: windows-build
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
+      - name: Validate release tag
+        run: |
+          if [[ ! "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag $GITHUB_REF is not a stable vX.Y.Z release tag."
+            exit 1
+          fi
+          echo "Release tag OK: $GITHUB_REF"
       - name: Download installer artifact
         uses: actions/download-artifact@v4
         with:
@@ -224,13 +260,36 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ./release-assets/FluxDisplay-win-x64-setup.exe
+            ./release-assets/FluxDisplay-*-setup.exe
             ./release-assets/FluxDisplay-win-x64-portable.zip
             ./release-assets/INSTALL-SETUP.txt
-            ./release-assets/FluxDisplay-win-x64-setup.sha256
+            ./release-assets/FluxDisplay-*-setup.sha256
             ./release-assets/FluxDisplay-win-x64-portable.sha256
           body: |
-            `FluxDisplay-win-x64-setup.exe` — installer, no admin rights required.
+            `FluxDisplay-<version>-setup.exe` — installer, no admin rights required.
             `FluxDisplay-win-x64-portable.zip` — unpack and run `Flux Display/FluxDisplay.App.exe`, no install.
             No certificate yet, so the first downloads may show a SmartScreen / Chrome
             reputation warning — the files are clean, verify via the `.sha256` files.
+      - name: Verify published asset digest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          # The updater refuses silent installs without a digest; fail the job
+          # if GitHub did not attach a SHA-256 digest to the setup asset.
+          DIGEST=$(gh release view "$TAG" --json assets --jq '.assets[] | select(.name | test("^FluxDisplay-[0-9]+\\.[0-9]+\\.[0-9]+-setup\\.exe$")) | .digest')
+          echo "setup asset digest: $DIGEST"
+          if [[ ! "$DIGEST" =~ ^sha256:[0-9a-fA-F]{64}$ ]]; then
+            echo "Published setup asset has no valid SHA-256 digest."
+            exit 1
+          fi
+          # The digest must equal the hash of the exact file CI built, not just
+          # be well-formed: otherwise clients would verify against nothing.
+          SHA_FILE=$(ls ./release-assets/FluxDisplay-*-setup.sha256)
+          BUILT_HASH=$(awk '{ print $1 }' "$SHA_FILE" | tr '[:upper:]' '[:lower:]')
+          PUBLISHED_HASH=$(echo "${DIGEST#sha256:}" | tr '[:upper:]' '[:lower:]')
+          if [[ "$BUILT_HASH" != "$PUBLISHED_HASH" ]]; then
+            echo "Digest mismatch: built $BUILT_HASH vs published $PUBLISHED_HASH."
+            exit 1
+          fi
+          echo "Digest matches the built installer."

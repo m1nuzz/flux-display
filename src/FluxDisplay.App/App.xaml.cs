@@ -198,7 +198,61 @@ public partial class App : Application
             }
 
             TrimWorkingSet();
+            StartUpdateChecks(window);
         });
+    }
+
+    // Update wiring (skipped in smoke modes): seed the mode cache, run the
+    // delayed startup check plus periodic checks, cancel everything when the
+    // main window closes. The matrix itself lives in UpdateOrchestrator.
+    private static void StartUpdateChecks(Window window)
+    {
+        try
+        {
+            // This app hides to tray instead of closing (MainWindow.OnClosed
+            // vetoes the close), so window.Closed alone is not a reliable
+            // shutdown signal — ProcessExit covers Application.Exit,
+            // Environment.Exit and external kills. Cancel() itself is sync.
+            System.AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+            {
+                try
+                {
+                    Services.Updates.Shutdown();
+                }
+                catch
+                {
+                }
+            };
+            window.Closed += (_, _) =>
+            {
+                try
+                {
+                    Services.Updates.Shutdown();
+                }
+                catch
+                {
+                }
+            };
+            AsyncHelper.FireAndForget(async () =>
+            {
+                try
+                {
+                    var settings = await Services.SettingsStore.LoadAsync().ConfigureAwait(false);
+                    Services.CachedUpdateMode = settings.UpdateMode;
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Error(ex, "Update.ModeCache");
+                }
+
+                Services.Updates.StartPeriodicChecks();
+                await Services.Updates.RunStartupCheckAsync().ConfigureAwait(false);
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error(ex, "Update.Startup");
+        }
     }
 
     private void HandleSmokeDumpAndExit(string[] args)

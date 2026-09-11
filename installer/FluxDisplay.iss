@@ -6,7 +6,9 @@
 ;   Output       : artifacts\FluxDisplay-win-x64-setup.exe
 
 #define MyAppName "FluxDisplay"
+#ifndef MyAppVersion
 #define MyAppVersion "1.0.0"
+#endif
 #define MyAppPublisher "m1nuzz"
 #define MyAppURL "https://github.com/m1nuzz/flux-display"
 #define MyAppExeName "FluxDisplay.App.exe"
@@ -35,6 +37,15 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.17763
 DisableProgramGroupPage=yes
 UninstallDisplayName={#MyAppName}
+; Silent updates: close the running app instead of showing "files in use".
+CloseApplications=yes
+; The ONLY restart mechanism is the [Run] entry below (silent updates) and the
+; launch checkbox (interactive installs). Restart Manager must never restart
+; the app on its own — this app does not register for restart, and a second
+; mechanism would risk launching it twice. Per-user install => no UAC, so the
+; relaunched app inherits the user's normal (non-elevated) token; no
+; runasoriginaluser needed.
+RestartApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -51,3 +62,8 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+; Silent updates relaunch the app exactly once (the checkbox above is skipped
+; in silent mode, so the two entries are mutually exclusive). Chosen instead
+; of RegisterApplicationRestart: no Restart Manager registration, no risk of a
+; double launch, deterministic with CloseApplications=yes.
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait postinstall skipifnotsilent

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluxDisplay.App.Models;
+using FluxDisplay.Core.Updates;
 
 namespace FluxDisplay.App.Services;
 
@@ -12,7 +13,14 @@ public sealed class SettingsRepository
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+        Converters =
+        {
+            // Specific converters first: JsonStringEnumConverter would claim
+            // every enum. Unknown UpdateMode strings recover to Automatic
+            // without failing the whole document.
+            new SafeUpdateModeJsonConverter(m => Helpers.AppLog.Info(m)),
+            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)
+        }
     };
 
     public SettingsRepository(string? storagePath = null)
