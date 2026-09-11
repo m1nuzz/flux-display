@@ -16,6 +16,15 @@ Checks also run every 6 hours (single-flight with manual/startup checks) and can
 triggered with **Check now**. HTTP 404 on `/latest` (no stable release) is a normal
 "No updates available", not an error.
 
+## Reinstall loop protection
+
+After a successful installer launch the offered version is recorded in
+settings (`lastInstalledUpdateVersion`). If a later check offers that same
+version again — e.g. version plumbing shipped a build that still reports the
+old number — the run is skipped as already installed instead of reinstalling
+forever. A stale record (manual downgrade, fixed plumbing) is forgotten
+automatically. A broken history store never blocks an update.
+
 ## Integrity policy
 
 - Only `sha256:<hex>` digests from the release metadata are accepted.

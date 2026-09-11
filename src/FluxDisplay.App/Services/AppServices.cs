@@ -48,6 +48,7 @@ public sealed class AppServices
             downloader,
             new UpdateInstaller(),
             new DialogUpdatePrompter(Dialog),
+            new SettingsInstallHistory(SettingsStore),
             () => CachedUpdateMode,
             () => UpdateSource.IsInstalledCopy,
             () => UpdateSource.CurrentVersion,
@@ -59,6 +60,29 @@ public sealed class AppServices
     {
         Current = new AppServices();
         return Current;
+    }
+
+    private sealed class SettingsInstallHistory : IInstallHistory
+    {
+        private readonly SettingsRepository _store;
+
+        public SettingsInstallHistory(SettingsRepository store)
+        {
+            _store = store;
+        }
+
+        public async Task<string?> GetLastInstalledAsync(CancellationToken ct)
+        {
+            var settings = await _store.LoadAsync(ct).ConfigureAwait(false);
+            return settings.LastInstalledUpdateVersion;
+        }
+
+        public async Task RecordInstalledAsync(string? version, CancellationToken ct)
+        {
+            var settings = await _store.LoadAsync(ct).ConfigureAwait(false);
+            settings.LastInstalledUpdateVersion = version;
+            await _store.SaveAsync(settings, ct).ConfigureAwait(false);
+        }
     }
 
     private sealed class DialogUpdatePrompter : IUpdatePrompter

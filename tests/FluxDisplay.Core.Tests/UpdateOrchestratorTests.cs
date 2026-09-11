@@ -64,6 +64,35 @@ public sealed class UpdateOrchestratorTests
         }
     }
 
+    private sealed class History : IInstallHistory
+    {
+        public string? Last;
+        public int Records;
+        public bool Throw;
+
+        public Task<string?> GetLastInstalledAsync(CancellationToken ct)
+        {
+            if (Throw)
+            {
+                throw new IOException("disk gone");
+            }
+
+            return Task.FromResult(Last);
+        }
+
+        public Task RecordInstalledAsync(string? version, CancellationToken ct)
+        {
+            if (Throw)
+            {
+                throw new IOException("disk gone");
+            }
+
+            Last = version;
+            Records++;
+            return Task.CompletedTask;
+        }
+    }
+
     private static UpdateOrchestrator Orch(
         Source source,
         Downloader downloader,
@@ -71,8 +100,9 @@ public sealed class UpdateOrchestratorTests
         Prompter prompter,
         UpdateMode mode = UpdateMode.Automatic,
         bool installed = true,
-        List<UpdateStateInfo>? states = null) =>
-        new(source, downloader, installer, prompter,
+        List<UpdateStateInfo>? states = null,
+        History? history = null) =>
+        new(source, downloader, installer, prompter, history ?? new History(),
             () => mode, () => installed, () => new Version(1, 0, 0, 0),
             states is null ? null : (Action<UpdateStateInfo>)(s => states.Add(s)));
 
@@ -248,6 +278,68 @@ public sealed class UpdateOrchestratorTests
         Assert.Same(result, joined);
         Assert.Equal(UpdateState.Installing, joined.State);
         Assert.Equal(1, downloader.Calls);
+        Assert.Equal(1, installer.Calls);
+    }
+
+    [Fact]
+    public async Task Install_records_version_in_history()
+    {
+        var history = new History();
+        var orch = Orch(AvailableSource(), new Downloader(), new Installer(), new Prompter(), history: history);
+        await orch.CheckAsync(UpdateTrigger.Startup);
+        Assert.Equal("1.2.0", history.Last);
+    }
+
+    [Fact]
+    public async Task Already_installed_version_is_skipped_without_download()
+    {
+        var downloader = new Downloader();
+        var installer = new Installer();
+        var history = new History { Last = "1.2.0" };
+        var orch = Orch(AvailableSource(), downloader, installer, new Prompter(), history: history);
+        var result = await orch.CheckAsync(UpdateTrigger.Startup);
+        Assert.Equal(UpdateState.NoUpdate, result.State);
+        Assert.Contains("already installed", result.Message);
+        Assert.Equal(0, downloader.Calls);
+        Assert.Equal(0, installer.Calls);
+    }
+
+    [Fact]
+    public async Task Newer_version_proceeds_despite_history()
+    {
+        var source = new Source
+        {
+            Result = new ReleaseQueryResult(ReleaseQueryStatus.Available, Info() with { Version = new Version(1, 3, 0, 0) }, null)
+        };
+        var installer = new Installer();
+        var history = new History { Last = "1.2.0" };
+        var orch = Orch(source, new Downloader(), installer, new Prompter(), history: history);
+        var result = await orch.CheckAsync(UpdateTrigger.Startup);
+        Assert.Equal(UpdateState.Installing, result.State);
+        Assert.Equal(1, installer.Calls);
+        Assert.Equal("1.3.0", history.Last);
+    }
+
+    [Fact]
+    public async Task Stale_history_is_cleared_and_flow_continues()
+    {
+        // Recorded 1.0.0 while running 1.0.0.0 (manual downgrade or fixed
+        // plumbing): forget it, install the offered 1.2.0 normally.
+        var history = new History { Last = "1.0.0" };
+        var installer = new Installer();
+        var orch = Orch(AvailableSource(), new Downloader(), installer, new Prompter(), history: history);
+        var result = await orch.CheckAsync(UpdateTrigger.Startup);
+        Assert.Equal(UpdateState.Installing, result.State);
+        Assert.Equal("1.2.0", history.Last);
+    }
+
+    [Fact]
+    public async Task Broken_history_never_blocks_an_update()
+    {
+        var installer = new Installer();
+        var orch = Orch(AvailableSource(), new Downloader(), installer, new Prompter(), history: new History { Throw = true });
+        var result = await orch.CheckAsync(UpdateTrigger.Startup);
+        Assert.Equal(UpdateState.Installing, result.State);
         Assert.Equal(1, installer.Calls);
     }
 

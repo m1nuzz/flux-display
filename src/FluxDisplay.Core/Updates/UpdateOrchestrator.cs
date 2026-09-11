@@ -25,6 +25,7 @@ public sealed class UpdateOrchestrator
     private readonly IUpdateDownloader _downloader;
     private readonly IUpdateInstaller _installer;
     private readonly IUpdatePrompter _prompter;
+    private readonly IInstallHistory _history;
     private readonly Func<UpdateMode> _mode;
     private readonly Func<bool> _isInstalledCopy;
     private readonly Func<Version> _currentVersion;
@@ -46,6 +47,7 @@ public sealed class UpdateOrchestrator
         IUpdateDownloader downloader,
         IUpdateInstaller installer,
         IUpdatePrompter prompter,
+        IInstallHistory history,
         Func<UpdateMode> mode,
         Func<bool> isInstalledCopy,
         Func<Version> currentVersion,
@@ -56,6 +58,7 @@ public sealed class UpdateOrchestrator
         _downloader = downloader;
         _installer = installer;
         _prompter = prompter;
+        _history = history;
         _mode = mode;
         _isInstalledCopy = isInstalledCopy;
         _currentVersion = currentVersion;
@@ -195,6 +198,12 @@ public sealed class UpdateOrchestrator
 
             var update = query.Update!;
             NoteSuccess();
+            if (await WasAlreadyInstalledAsync(update.Version, token).ConfigureAwait(false))
+            {
+                _log?.Invoke($"Update {UpdateVersion.FormatShort(update.Version)} already installed, skipping.");
+                return Report(UpdateState.NoUpdate, $"Update {UpdateVersion.FormatShort(update.Version)} already installed");
+            }
+
             Report(UpdateState.UpdateAvailable, "Update available");
             var installed = SafeIsInstalledCopy();
             if (mode == UpdateMode.Automatic && installed)
@@ -273,6 +282,10 @@ public sealed class UpdateOrchestrator
             }
 
             Report(UpdateState.Installing, "Installing update…");
+            // Record BEFORE the handoff: a successful install exits the
+            // process, so nothing after InstallAsync runs. On launch failure
+            // the record is cleared again below.
+            await RecordInstalledAsync(UpdateVersion.FormatShort(update.Version)).ConfigureAwait(false);
             try
             {
                 await _installer.InstallAsync(downloaded, token).ConfigureAwait(false);
@@ -283,6 +296,7 @@ public sealed class UpdateOrchestrator
             }
             catch (Exception ex)
             {
+                await RecordInstalledAsync(null).ConfigureAwait(false);
                 _log?.Invoke($"Update install failed: {ex.GetType().Name}.");
                 return Report(UpdateState.Failed, "Update install failed");
             }
@@ -333,6 +347,61 @@ public sealed class UpdateOrchestrator
         catch
         {
             return false;
+        }
+    }
+
+    // Loop protection: skip an offered version this updater already
+    // installed (broken version plumbing would otherwise reinstall forever).
+    // A stale record (manual downgrade, fixed plumbing) is forgotten so a
+    // genuinely newer-or-equal offer flows normally. History errors are
+    // ignored: worst case is one redundant install attempt, never a skip.
+    private async Task<bool> WasAlreadyInstalledAsync(Version offered, CancellationToken ct)
+    {
+        try
+        {
+            var last = await _history.GetLastInstalledAsync(ct).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(last))
+            {
+                return false;
+            }
+
+            if (!UpdateVersion.TryParseTag(last.Trim(), out var recorded))
+            {
+                return false;
+            }
+
+            var current = SafeCurrentVersion();
+            if (UpdateVersion.Compare(recorded, current) <= 0)
+            {
+                try
+                {
+                    await _history.RecordInstalledAsync(null, ct).ConfigureAwait(false);
+                }
+                catch
+                {
+                }
+
+                return false;
+            }
+
+            return UpdateVersion.Compare(recorded, offered) == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task RecordInstalledAsync(string? version)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await _history.RecordInstalledAsync(version, cts.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _log?.Invoke($"Install history record failed: {ex.GetType().Name}.");
         }
     }
 

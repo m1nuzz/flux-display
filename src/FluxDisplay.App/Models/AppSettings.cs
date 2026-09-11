@@ -20,4 +20,7 @@ public sealed class AppSettings
     public bool ConfirmBeforeApply { get; set; }
     public AppTheme Theme { get; set; } = AppTheme.System;
     public UpdateMode UpdateMode { get; set; } = UpdateMode.Automatic;
+    // Last version installed by the updater (short form, e.g. "1.2.0").
+    // Loop protection: the same offer is skipped, never reinstalled.
+    public string? LastInstalledUpdateVersion { get; set; }
 }
