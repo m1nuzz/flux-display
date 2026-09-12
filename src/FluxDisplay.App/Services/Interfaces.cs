@@ -36,6 +36,12 @@ public interface ITrayService : IDisposable
     bool WarmUpMenuHost();
     void UpdatePresets(IReadOnlyList<Preset> presets, Guid? activePresetId);
     void ShowNotification(string title, string message);
+    // Orderly teardown before process exit. Must run on the UI thread.
+    void Shutdown();
+    // Hides the menu host window when the app goes fully idle (hide to
+    // tray), unless its flyout is currently open. A host left visible
+    // (transparent layered window) is composited every vsync forever.
+    void ParkMenuHost();
     event EventHandler? OpenRequested;
     event EventHandler<Guid>? PresetApplyRequested;
 }

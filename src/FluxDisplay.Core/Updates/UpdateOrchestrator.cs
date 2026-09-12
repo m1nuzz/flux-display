@@ -41,6 +41,7 @@ public sealed class UpdateOrchestrator
     private DateTime _backoffUntilUtc;
     private Task? _periodicTask;
     private int _periodicStarted;
+    private readonly HashSet<string> _promptedVersions = new(StringComparer.OrdinalIgnoreCase);
 
     public UpdateOrchestrator(
         IUpdateSource source,
@@ -219,6 +220,15 @@ public sealed class UpdateOrchestrator
             }
             else
             {
+                var offered = UpdateVersion.FormatShort(update.Version);
+                lock (_promptedVersions)
+                {
+                    if (_promptedVersions.Contains(offered))
+                    {
+                        return Report(UpdateState.Cancelled, "Update cancelled");
+                    }
+                }
+
                 bool confirmed;
                 try
                 {
@@ -236,6 +246,11 @@ public sealed class UpdateOrchestrator
 
                 if (!confirmed)
                 {
+                    lock (_promptedVersions)
+                    {
+                        _promptedVersions.Add(offered);
+                    }
+
                     return Report(UpdateState.Cancelled, "Update cancelled");
                 }
             }

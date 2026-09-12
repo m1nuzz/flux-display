@@ -75,13 +75,7 @@ public sealed class UpdateInstaller : IUpdateInstaller
 
     private static void Exit()
     {
-        try
-        {
-            Application.Current.Exit();
-        }
-        catch
-        {
-            Environment.Exit(0);
-        }
+        // Same orderly teardown as tray Exit (disposes the tray icon first).
+        App.ExitApplication();
     }
 }

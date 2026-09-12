@@ -344,6 +344,18 @@ public sealed class UpdateOrchestratorTests
     }
 
     [Fact]
+    public async Task Declined_version_is_not_asked_twice()
+    {
+        var source = AvailableSource();
+        var prompter = new Prompter { Answer = false };
+        var orch = Orch(source, new Downloader(), new Installer(), prompter, UpdateMode.NotifyOnly, installed: true);
+        Assert.Equal(UpdateState.Cancelled, (await orch.CheckAsync(UpdateTrigger.Startup)).State);
+        Assert.Equal(UpdateState.Cancelled, (await orch.CheckAsync(UpdateTrigger.Manual)).State);
+        Assert.Equal(1, prompter.Calls);
+        Assert.Equal(2, source.Calls);
+    }
+
+    [Fact]
     public async Task Up_to_date_reports_neutral_state()
     {
         var states = new List<UpdateStateInfo>();

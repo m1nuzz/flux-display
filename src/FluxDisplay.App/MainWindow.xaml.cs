@@ -45,6 +45,18 @@ public sealed partial class MainWindow : Window
         {
             try
             {
+                // Restore the backdrop dropped on hide (see HideToTray).
+                if (SystemBackdrop is null)
+                {
+                    SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop();
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
                 var hwnd = WindowNative.GetWindowHandle(this);
                 ShowWindow(hwnd, 9);
                 SetForegroundWindow(hwnd);
@@ -57,8 +69,54 @@ public sealed partial class MainWindow : Window
         });
     }
 
-    private void HideToTray()
+    // Internal for the lifecycle smoke test (same assembly).
+    internal void HideToTray()
     {
+        try
+        {
+            // A hidden window must cost nothing: drop Mica so DWM keeps no
+            // live backdrop surface for us while we sit in the tray. Without
+            // this the process holds ~0.1% GPU forever after the first show.
+            SystemBackdrop = null;
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            // Close menu popups before hiding: a popup open across hide/show
+            // leaves WS_VISIBLE ghost PopupHost windows behind (they composite
+            // every vsync and eat input). Content dialogs are left alone.
+            if (Content is FrameworkElement root && root.XamlRoot is not null)
+            {
+                foreach (var popup in Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(root.XamlRoot))
+                {
+                    try
+                    {
+                        if (popup.Child is Microsoft.UI.Xaml.Controls.MenuFlyoutPresenter)
+                        {
+                            popup.IsOpen = false;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            App.Services.Tray.ParkMenuHost();
+        }
+        catch
+        {
+        }
+
         try
         {
             var hwnd = WindowNative.GetWindowHandle(this);
@@ -118,6 +176,12 @@ public sealed partial class MainWindow : Window
             {
                 appWindow.Closing += (_, e) =>
                 {
+                    // Same as OnClosed: never veto a real process exit.
+                    if (App.IsExiting)
+                    {
+                        return;
+                    }
+
                     e.Cancel = true;
                     HideToTray();
                 };
@@ -130,6 +194,13 @@ public sealed partial class MainWindow : Window
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
+        // During real process exit the close must go through (hiding would
+        // strand the shutdown behind a vetoed close).
+        if (App.IsExiting)
+        {
+            return;
+        }
+
         args.Handled = true;
         HideToTray();
     }

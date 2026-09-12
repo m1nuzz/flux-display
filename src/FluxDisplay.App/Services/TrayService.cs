@@ -758,7 +758,7 @@ public sealed class TrayService : ITrayService
                 Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xCC, 0xCC, 0xCC))
             }
         };
-        exit.Click += (_, _) => Application.Current.Exit();
+        exit.Click += (_, _) => App.ExitApplication();
         flyout.Items.Add(exit);
 
         // Assigned exactly once per process. See crash note above.
@@ -926,6 +926,71 @@ public sealed class TrayService : ITrayService
         catch
         {
             return new Uri("ms-appx:///Assets/StoreLogo.png");
+        }
+    }
+
+    // Orderly teardown before process exit (tray Exit, update install).
+    // Native message/subclass windows must be destroyed on the UI thread
+    // while the CLR is alive: if they outlive managed delegates into process
+    // teardown, the next message to them ends in a FailFast crash dialog
+    // (stack buffer overrun). Safe to call twice; never throws.
+    public void Shutdown()
+    {
+        try
+        {
+            try
+            {
+                _taskbarIcon?.ContextFlyout?.Hide();
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                var handle = GetMenuHostHandle();
+                if (handle != 0 && IsWindow(handle))
+                {
+                    _ = ShowWindow(handle, 0);
+                }
+            }
+            catch
+            {
+            }
+
+            LogMenuHostLiveness("shutdown");
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "tray-shutdown");
+        }
+        finally
+        {
+            Dispose();
+        }
+    }
+
+    public void ParkMenuHost()
+    {
+        try
+        {
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            var flyout = typeof(TaskbarIcon).GetProperty("ContextMenuFlyout", flags)?.GetValue(_taskbarIcon) as MenuFlyout;
+            if (flyout?.IsOpen == true)
+            {
+                return;
+            }
+
+            var handle = GetMenuHostHandle();
+            if (handle != 0 && IsWindow(handle) && IsWindowVisible(handle))
+            {
+                _ = ShowWindow(handle, 0);
+                Helpers.AppLog.Info("menu-host parked hidden");
+            }
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "menu-host park");
         }
     }
 

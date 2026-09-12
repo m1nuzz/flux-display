@@ -8,21 +8,75 @@ public sealed class DialogService : IDialogService
 {
     public async Task ShowInfoAsync(string title, string message)
     {
-        var dialog = CreateDialog(title, message, "OK", null);
-        await ShowAsync(dialog).ConfigureAwait(false);
+        await RunOnUIAsync(async () =>
+        {
+            var dialog = CreateDialog(title, message, "OK", null);
+            return await ShowAsync(dialog).ConfigureAwait(false);
+        }).ConfigureAwait(false);
     }
 
     public async Task<bool> ShowConfirmAsync(string title, string message, string primaryButtonText = "Apply", string closeButtonText = "Cancel")
     {
-        var dialog = CreateDialog(title, message, primaryButtonText, closeButtonText);
-        var result = await ShowAsync(dialog).ConfigureAwait(false);
+        var result = await RunOnUIAsync(async () =>
+        {
+            var dialog = CreateDialog(title, message, primaryButtonText, closeButtonText);
+            return await ShowAsync(dialog).ConfigureAwait(false);
+        }).ConfigureAwait(false);
         return result == ContentDialogResult.Primary;
     }
 
     public async Task ShowErrorAsync(string title, string message)
     {
-        var dialog = CreateDialog(title, message, "OK", null);
-        await ShowAsync(dialog).ConfigureAwait(false);
+        await RunOnUIAsync(async () =>
+        {
+            var dialog = CreateDialog(title, message, "OK", null);
+            return await ShowAsync(dialog).ConfigureAwait(false);
+        }).ConfigureAwait(false);
+    }
+
+    // WinUI controls (including ContentDialog construction) require the UI
+    // thread. Callers come from background threads (update orchestrator), so
+    // the whole create+show runs marshalled. Returns default on failure
+    // instead of throwing into background flows.
+    private static async Task<T> RunOnUIAsync<T>(Func<Task<T>> work)
+    {
+        var window = App.MainWindow;
+        if (window is null)
+        {
+            return default!;
+        }
+
+        if (window.DispatcherQueue.HasThreadAccess)
+        {
+            try
+            {
+                return await work().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Helpers.AppLog.Error(ex, "DialogService.RunOnUI");
+                return default!;
+            }
+        }
+
+        var tcs = new TaskCompletionSource<T>();
+        if (!window.DispatcherQueue.TryEnqueue(async () =>
+        {
+            try
+            {
+                tcs.SetResult(await work().ConfigureAwait(false));
+            }
+            catch (Exception ex)
+            {
+                Helpers.AppLog.Error(ex, "DialogService.RunOnUI");
+                tcs.SetResult(default!);
+            }
+        }))
+        {
+            return default!;
+        }
+
+        return await tcs.Task.ConfigureAwait(false);
     }
 
     private static ContentDialog CreateDialog(string title, string message, string? primaryText, string? closeText)

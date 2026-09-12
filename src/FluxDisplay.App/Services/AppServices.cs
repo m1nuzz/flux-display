@@ -94,8 +94,23 @@ public sealed class AppServices
             _dialog = dialog;
         }
 
-        public Task<bool> ConfirmInstallAsync(UpdateInfo update, bool isInstalledCopy, CancellationToken ct)
+        public async Task<bool> ConfirmInstallAsync(UpdateInfo update, bool isInstalledCopy, CancellationToken ct)
         {
+            // A modal dialog on a hidden window is invisible and unclickable
+            // (and an open-but-invisible popup keeps composition work going).
+            // Bring the main window out first.
+            try
+            {
+                if (App.MainWindow is MainWindow main)
+                {
+                    main.ShowFromTray();
+                    await Task.Delay(600, ct).ConfigureAwait(false);
+                }
+            }
+            catch
+            {
+            }
+
             var target = isInstalledCopy
                 ? "Download and install it now?"
                 : "This is a portable copy, so the installer will create/update the installed copy. Continue?";
@@ -107,11 +122,11 @@ public sealed class AppServices
                 target += " Warning: this release has no checksum, so the download cannot be verified.";
             }
 
-            return _dialog.ShowConfirmAsync(
+            return await _dialog.ShowConfirmAsync(
                 "Update available",
                 $"FluxDisplay {UpdateVersion.FormatShort(update.Version)} is available. {target}",
                 "Update",
-                "Later");
+                "Later").ConfigureAwait(false);
         }
     }
 }

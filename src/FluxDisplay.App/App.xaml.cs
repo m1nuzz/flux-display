@@ -12,6 +12,52 @@ public partial class App : Application
     public static Window? MainWindow { get; private set; }
     public static AppServices Services { get; private set; } = null!;
 
+    // True once ExitApplication starts. MainWindow.OnClosed must not veto the
+    // close (hide-to-tray) while the process is really going away.
+    internal static bool IsExiting { get; private set; }
+
+    // The only graceful exit path (tray Exit, update install). Tears the tray
+    // icon down on the UI thread first — see TrayService.Shutdown — because
+    // tearing native windows down during CLR shutdown crash-dialogs the exit.
+    // Never throws; falls back to Environment.Exit.
+    public static void ExitApplication()
+    {
+        try
+        {
+            var queue = MainWindow?.DispatcherQueue;
+            if (queue is not null && !queue.HasThreadAccess)
+            {
+                queue.TryEnqueue(ExitApplication);
+                return;
+            }
+
+            IsExiting = true;
+            try
+            {
+                Services.Tray.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error(ex, "App.ExitShutdown");
+            }
+
+            Helpers.AppLog.Info("App.ExitApplication exiting");
+            Current.Exit();
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                AppLog.Error(ex, "App.Exit");
+            }
+            catch
+            {
+            }
+
+            Environment.Exit(0);
+        }
+    }
+
     public App()
     {
         AppLog.RunHeader(Environment.GetCommandLineArgs());
@@ -155,7 +201,11 @@ public partial class App : Application
         }
 
         var smokeUi = cmd.Any(a => a == "--smoke-ui");
-        if (!smokeUi)
+        var smokeLifecycle = cmd.Any(a => a == "--smoke-lifecycle");
+        var smokeHide = cmd.Any(a => a == "--smoke-hide");
+        var smokeClock = cmd.Any(a => a == "--smoke-clock");
+        var smokeMenu = cmd.Any(a => a == "--smoke-menu");
+        if (!smokeUi && !smokeLifecycle && !smokeHide && !smokeClock && !smokeMenu)
         {
             var instance = AppInstance.FindOrRegisterForKey("flux-display-main");
             if (!instance.IsCurrent)
@@ -194,6 +244,58 @@ public partial class App : Application
 
                 await SmokeUiRunner.RunAsync(window, outDir).ConfigureAwait(true);
                 Current.Exit();
+                return;
+            }
+
+            if (smokeLifecycle)
+            {
+                var lifecycleDir = cmd.SkipWhile(a => a != "--smoke-lifecycle").Skip(1).FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(lifecycleDir) || lifecycleDir.StartsWith('-'))
+                {
+                    lifecycleDir = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "ui-smoke");
+                }
+
+                // Ends the process itself via App.ExitApplication.
+                await SmokeUiRunner.RunLifecycleAsync(window, lifecycleDir).ConfigureAwait(true);
+                return;
+            }
+
+            if (smokeHide)
+            {
+                var hideDir = cmd.SkipWhile(a => a != "--smoke-hide").Skip(1).FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(hideDir) || hideDir.StartsWith('-'))
+                {
+                    hideDir = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "ui-smoke");
+                }
+
+                // Never returns (killed externally); no update checks here.
+                await SmokeUiRunner.RunHideAndStayAsync(window, hideDir).ConfigureAwait(true);
+                return;
+            }
+
+            if (smokeClock)
+            {
+                var clockDir = cmd.SkipWhile(a => a != "--smoke-clock").Skip(1).FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(clockDir) || clockDir.StartsWith('-'))
+                {
+                    clockDir = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "ui-smoke");
+                }
+
+                // Ends the process itself via App.ExitApplication.
+                await SmokeUiRunner.RunClockProbeAsync(window, clockDir).ConfigureAwait(true);
+                return;
+            }
+
+            if (smokeMenu)
+            {
+                var menuDir = cmd.SkipWhile(a => a != "--smoke-menu").Skip(1).FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(menuDir) || menuDir.StartsWith('-'))
+                {
+                    menuDir = Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "ui-smoke");
+                }
+
+                // Ends the process itself via App.ExitApplication.
+                await SmokeUiRunner.RunMenuProbeAsync(window, menuDir).ConfigureAwait(true);
                 return;
             }
 
