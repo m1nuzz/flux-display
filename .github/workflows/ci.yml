@@ -285,7 +285,8 @@ jobs:
           DIGEST=""
           for i in 1 2 3 4 5 6; do
             echo "Attempt $i: reading published assets for $ASSET..."
-            OUT=$(gh release view "$TAG" --json assets 2>&1) || { echo "gh failed (try $i): $OUT"; sleep 10; continue; }
+            # -R: this job has no checkout, so gh cannot discover the repo from git.
+            OUT=$(gh release view "$TAG" --json assets -R "$GITHUB_REPOSITORY" 2>&1) || { echo "gh failed (try $i): $OUT"; sleep 10; continue; }
             DIGEST=$(printf '%s' "$OUT" | jq -r --arg n "$ASSET" '.assets[] | select(.name == $n) | .digest // empty')
             if [ -z "$DIGEST" ]; then echo "asset not listed yet, retrying..."; sleep 10; continue; fi
             break
