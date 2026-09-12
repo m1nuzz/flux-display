@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using FluxDisplay.App.Helpers;
 using FluxDisplay.App.Models;
 using Microsoft.UI;
@@ -158,6 +159,26 @@ internal static class SmokeUiRunner
             await Task.Delay(TimeSpan.FromSeconds(2));
             var dwmHidden = SampleDwm(hwnd);
             log.Add($"visible windows while hidden: {string.Join(" | ", ListVisibleWindows())}");
+            // Hidden-idle budget (stolen from flux-launcher's idle smoke): a
+            // hidden window must do no work. CPU time bounds timers/loops,
+            // zero DWM submits bound presents. Generous enough for CI noise,
+            // tight enough to catch a busy loop or a presenting popup.
+            var cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
+            await Task.Delay(TimeSpan.FromSeconds(10));
+            var cpuMs = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalMilliseconds;
+            var dwmHiddenBudget = SampleDwm(hwnd);
+            var submittedDelta = dwmHiddenBudget.Submitted - dwmHidden.Submitted;
+            log.Add($"hidden 10s budget: cpu={cpuMs:0}ms (limit 1000), submitted+={submittedDelta} (limit 0)");
+            if (cpuMs > 1000)
+            {
+                throw new InvalidOperationException($"Hidden idle CPU budget exceeded: {cpuMs:0} ms over 10 seconds.");
+            }
+
+            if (dwmHidden.Submitted >= 0 && submittedDelta != 0)
+            {
+                throw new InvalidOperationException($"Hidden window presented {submittedDelta} frames in 10 seconds.");
+            }
+
             var hidden = await CountFramesAsync(TimeSpan.FromSeconds(10));
             var dwmHiddenMid = SampleDwm(hwnd);
             log.Add($"rendering hidden 10s: {hidden}");
