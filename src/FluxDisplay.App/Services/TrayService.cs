@@ -522,13 +522,16 @@ public sealed class TrayService : ITrayService
     // Rescue for the 2.3.0 first-open race: the library calls ShowAt ONLY
     // from the menu host's Activated handler. If activation never lands, the
     // host sits visible with IsContextMenuVisible=true but the flyout closed
-    // (invisible first open, fine on the second click). ~250ms after the
-    // click, if the library is still mid-show AND the host ended up in the
-    // foreground, open the internal flyout directly — same ShowAt the library
-    // would have run. The foreground check is the safety: an already-active
-    // host gets no further Activated events, so the library can no longer
-    // ShowAt and a double-open is impossible. If the host is NOT foreground
-    // (activation genuinely denied), we stay out of the way.
+    // (invisible first open, fine on the second click). After the click, poll
+    // briefly: the fast path opens in ~10ms, so start checking at +60ms and
+    // then every 30ms until +240ms. If the library is still mid-show AND the
+    // host ended up in the foreground, open the internal flyout directly —
+    // same ShowAt the library would have run. The foreground check is the
+    // safety: an already-active host gets no further Activated events, so the
+    // library can no longer ShowAt and a double-open is impossible. If the
+    // host is NOT foreground (activation genuinely denied), we stay out of
+    // the way. The loop is strictly bounded (one click, ~240ms max) — no
+    // background polling: every iteration exits on the first resolved state.
     private void EnqueueMenuRescue()
     {
         try
@@ -537,41 +540,51 @@ public sealed class TrayService : ITrayService
             {
                 try
                 {
-                    await Task.Delay(250).ConfigureAwait(true);
                     const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
                     var t = typeof(TaskbarIcon);
-                    var flyout = t.GetProperty("ContextMenuFlyout", flags)?.GetValue(_taskbarIcon) as MenuFlyout;
-                    if (flyout is null || flyout.IsOpen)
+                    await Task.Delay(60).ConfigureAwait(true);
+                    var deadline = Environment.TickCount64 + 180;
+                    while (true)
                     {
-                        return;
-                    }
+                        var flyout = t.GetProperty("ContextMenuFlyout", flags)?.GetValue(_taskbarIcon) as MenuFlyout;
+                        if (flyout is null || flyout.IsOpen)
+                        {
+                            return;
+                        }
 
-                    if (t.GetProperty("IsContextMenuVisible", flags)?.GetValue(_taskbarIcon) is not true)
-                    {
-                        return;
-                    }
+                        if (t.GetProperty("IsContextMenuVisible", flags)?.GetValue(_taskbarIcon) is not true)
+                        {
+                            return;
+                        }
 
-                    var handle = GetMenuHostHandle();
-                    if (handle == 0 || !IsWindow(handle) || !IsWindowVisible(handle))
-                    {
-                        return;
-                    }
+                        var handle = GetMenuHostHandle();
+                        if (handle == 0 || !IsWindow(handle) || !IsWindowVisible(handle))
+                        {
+                            return;
+                        }
 
-                    var fg = GetForegroundWindow();
-                    Helpers.AppLog.Info($"menu-rescue check fg=0x{fg.ToInt64():X} host=0x{handle:X}");
-                    if (fg.ToInt64() != handle)
-                    {
-                        return;
-                    }
+                        var fg = GetForegroundWindow().ToInt64();
+                        if (fg == handle)
+                        {
+                            var anchor = (t.GetProperty("ContextMenuWindow", flags)?.GetValue(_taskbarIcon) as Window)?.Content as FrameworkElement;
+                            if (anchor is null)
+                            {
+                                return;
+                            }
 
-                    var anchor = (t.GetProperty("ContextMenuWindow", flags)?.GetValue(_taskbarIcon) as Window)?.Content as FrameworkElement;
-                    if (anchor is null)
-                    {
-                        return;
-                    }
+                            flyout.ShowAt(anchor, new FlyoutShowOptions { ShowMode = FlyoutShowMode.Transient });
+                            Helpers.AppLog.Info("menu-rescue ShowAt fired");
+                            return;
+                        }
 
-                    flyout.ShowAt(anchor, new FlyoutShowOptions { ShowMode = FlyoutShowMode.Transient });
-                    Helpers.AppLog.Info("menu-rescue ShowAt fired");
+                        if (Environment.TickCount64 >= deadline)
+                        {
+                            Helpers.AppLog.Info($"menu-rescue gave up fg=0x{fg:X} host=0x{handle:X}");
+                            return;
+                        }
+
+                        await Task.Delay(30).ConfigureAwait(true);
+                    }
                 }
                 catch (Exception ex)
                 {
