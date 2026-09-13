@@ -4,7 +4,6 @@ public sealed class PresetCardModel
 {
     public required Preset Preset { get; init; }
     public required bool IsActive { get; init; }
-    public required bool IsFavorite { get; init; }
 
     public string Name => Preset.Name;
     public Guid Id => Preset.Id;

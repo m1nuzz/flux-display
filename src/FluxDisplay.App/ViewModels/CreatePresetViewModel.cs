@@ -247,7 +247,8 @@ public sealed partial class CreatePresetViewModel : ObservableObject
             ScalePercent = primary.ScalePercent,
             Targets = targets,
             CreatedAt = _editingSource?.CreatedAt ?? DateTime.UtcNow,
-            LastAppliedAt = _editingSource?.LastAppliedAt
+            LastAppliedAt = _editingSource?.LastAppliedAt,
+            ShowInTray = _editingSource?.ShowInTray ?? true
         };
 
         var errors = _validator.Validate(ToCore(preset));

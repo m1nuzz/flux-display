@@ -26,14 +26,13 @@ public sealed partial class PresetViewModel : ObservableObject
     [ObservableProperty]
     private bool _isApplying;
 
+    [ObservableProperty]
+    private bool _showInTray;
+
     public IAsyncRelayCommand? ApplyCommand { get; set; }
     public IAsyncRelayCommand? DeleteCommand { get; set; }
     public IRelayCommand? EditCommand { get; set; }
-
-    public PresetCardModel ToCard() => new()
-    {
-        Preset = Preset,
-        IsActive = IsActive,
-        IsFavorite = false
-    };
+    public IAsyncRelayCommand? ToggleTrayCommand { get; set; }
+    public IRelayCommand? MoveUpCommand { get; set; }
+    public IRelayCommand? MoveDownCommand { get; set; }
 }

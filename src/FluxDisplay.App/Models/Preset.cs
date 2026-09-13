@@ -11,6 +11,11 @@ public sealed class Preset
     public List<PresetTarget> Targets { get; set; } = [];
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     public DateTime? LastAppliedAt { get; set; }
+    // Whether the preset appears in the tray menu, in list order.
+    // Defaults to true so new presets (and pre-flag files, where the JSON
+    // member is absent and the initializer survives deserialization) land
+    // in the tray without any migration.
+    public bool ShowInTray { get; set; } = true;
 
     public IReadOnlyList<PresetTarget> GetTargets()
     {

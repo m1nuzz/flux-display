@@ -859,7 +859,9 @@ public sealed class TrayService : ITrayService
 
     private void RefreshMenuItems()
     {
-        var presets = _presets.Take(MaxMenuPresets).ToList();
+        // Tray order follows the main list order; presets unticked on their
+        // cards (ShowInTray=false) are skipped but stay in the main window.
+        var presets = _presets.Where(p => p.ShowInTray).Take(MaxMenuPresets).ToList();
         for (var i = 0; i < _presetSlots.Count; i++)
         {
             var slot = _presetSlots[i];
@@ -882,7 +884,7 @@ public sealed class TrayService : ITrayService
             _emptyItem.Visibility = presets.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        Helpers.AppLog.Info($"TrayService menu refreshed presets={presets.Count}");
+        Helpers.AppLog.Info($"TrayService menu refreshed presets={presets.Count} order={string.Join(",", presets.Select(p => p.Name))}");
     }
 
     private string FormatMenuSubtitle(Preset preset)

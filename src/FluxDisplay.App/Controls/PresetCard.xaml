@@ -15,7 +15,30 @@
             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="★" Opacity="0.7" />
+                    <Button
+                        Padding="4"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Command="{Binding ToggleTrayCommand}"
+                        CommandParameter="{Binding}"
+                        ToolTipService.ToolTip="Show in tray">
+                        <Grid>
+                            <FontIcon
+                                Glyph="&#xE890;"
+                                FontSize="16"
+                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding ShowInTray, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <FontIcon
+                                Glyph="&#xE7B3;"
+                                FontSize="16"
+                                Opacity="0.5"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding ShowInTray, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}" />
+                        </Grid>
+                    </Button>
                     <Border
                         Background="{StaticResource ActiveBadgeBrush}"
                         CornerRadius="12"
@@ -37,6 +60,8 @@
                     <Button.Flyout>
                         <MenuFlyout>
                             <MenuFlyoutItem Text="Edit" Command="{Binding EditCommand}" CommandParameter="{Binding}" />
+                            <MenuFlyoutItem Text="Move up" Command="{Binding MoveUpCommand}" CommandParameter="{Binding}" />
+                            <MenuFlyoutItem Text="Move down" Command="{Binding MoveDownCommand}" CommandParameter="{Binding}" />
                             <MenuFlyoutItem Text="Delete" Command="{Binding DeleteCommand}" CommandParameter="{Binding}" />
                         </MenuFlyout>
                     </Button.Flyout>

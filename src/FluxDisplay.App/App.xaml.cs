@@ -311,6 +311,16 @@ public partial class App : Application
     {
         try
         {
+            // Dev copies (local bin builds) report the unstamped 1.0.0 version
+            // and would nag about every release — and an accidental Update
+            // would touch the real installed copy. Skip automatic checks here;
+            // manual "Check now" in Settings stays available.
+            if (AppContext.BaseDirectory.Contains(@"\bin\", StringComparison.OrdinalIgnoreCase))
+            {
+                AppLog.Info("Update checks skipped: dev copy");
+                return;
+            }
+
             // This app hides to tray instead of closing (MainWindow.OnClosed
             // vetoes the close), so window.Closed alone is not a reliable
             // shutdown signal — ProcessExit covers Application.Exit,

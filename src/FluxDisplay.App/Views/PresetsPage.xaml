@@ -27,18 +27,28 @@
                 Command="{Binding RequestAddCommand}" />
         </Grid>
 
-        <ScrollViewer Grid.Row="1" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}">
-            <ItemsRepeater ItemsSource="{Binding Items}">
-                <ItemsRepeater.Layout>
-                    <StackLayout Spacing="0" />
-                </ItemsRepeater.Layout>
-                <ItemsRepeater.ItemTemplate>
-                    <DataTemplate x:DataType="vm:PresetViewModel">
-                        <controls:PresetCard DataContext="{Binding}" />
-                    </DataTemplate>
-                </ItemsRepeater.ItemTemplate>
-            </ItemsRepeater>
-        </ScrollViewer>
+        <ListView
+            x:Name="PresetList"
+            Grid.Row="1"
+            ItemsSource="{Binding Items}"
+            SelectionMode="None"
+            CanReorderItems="True"
+            AllowDrop="True"
+            ReorderMode="Enabled"
+            DragItemsCompleted="PresetList_DragItemsCompleted"
+            Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:PresetViewModel">
+                    <controls:PresetCard DataContext="{Binding}" />
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
 
         <StackPanel
             Grid.RowSpan="2"
