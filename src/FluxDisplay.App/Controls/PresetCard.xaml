@@ -23,15 +23,15 @@
                         CommandParameter="{Binding}"
                         ToolTipService.ToolTip="Show in tray">
                         <Grid>
-                            <FontIcon
-                                Glyph="&#xE890;"
+                            <TextBlock
+                                Text="★"
                                 FontSize="16"
                                 Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Visibility="{Binding ShowInTray, Converter={StaticResource BoolToVisibilityConverter}}" />
-                            <FontIcon
-                                Glyph="&#xE7B3;"
+                            <TextBlock
+                                Text="☆"
                                 FontSize="16"
                                 Opacity="0.5"
                                 HorizontalAlignment="Center"
