@@ -15,7 +15,7 @@
             Grid.Row="1"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
-            PaneDisplayMode="Auto"
+            PaneDisplayMode="LeftCompact"
             SelectionChanged="NavView_SelectionChanged">
             <NavigationView.MenuItems>
                 <NavigationViewItem Content="Presets" Tag="presets" Icon="Home" />

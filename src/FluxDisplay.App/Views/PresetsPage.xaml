@@ -35,6 +35,8 @@
             CanReorderItems="True"
             AllowDrop="True"
             ReorderMode="Enabled"
+            ScrollViewer.HorizontalScrollMode="Disabled"
+            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
             DragItemsCompleted="PresetList_DragItemsCompleted"
             Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}">
             <ListView.ItemContainerStyle>
