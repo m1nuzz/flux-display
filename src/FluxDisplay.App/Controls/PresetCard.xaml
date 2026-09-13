@@ -14,11 +14,15 @@
             </Border>
             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                     <Button
                         Padding="4"
+                        MinHeight="0"
+                        MinWidth="0"
                         Background="Transparent"
                         BorderThickness="0"
+                        VerticalAlignment="Center"
+                        VerticalContentAlignment="Center"
                         Command="{Binding ToggleTrayCommand}"
                         CommandParameter="{Binding}"
                         ToolTipService.ToolTip="Show in tray">
@@ -43,8 +47,9 @@
                         Background="{StaticResource ActiveBadgeBrush}"
                         CornerRadius="12"
                         Padding="8,2"
+                        VerticalAlignment="Center"
                         Visibility="{Binding IsActive, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <TextBlock Text="Active" FontSize="11" />
+                        <TextBlock Text="Active" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center" />
                     </Border>
                 </StackPanel>
                 <TextBlock Text="{Binding MonitorName}" Style="{StaticResource FluxMutedTextStyle}" TextTrimming="CharacterEllipsis" MaxLines="1" />
