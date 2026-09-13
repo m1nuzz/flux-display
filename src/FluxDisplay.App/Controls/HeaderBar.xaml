@@ -7,14 +7,67 @@
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup>
+                <VisualStateGroup.Transitions>
+                    <VisualTransition From="Wide" To="Narrow" GeneratedDuration="0:0:0.2">
+                        <Storyboard>
+                            <DoubleAnimation
+                                Storyboard.TargetName="BadgeBorder"
+                                Storyboard.TargetProperty="Opacity"
+                                From="1"
+                                To="0"
+                                Duration="0:0:0.2" />
+                            <ObjectAnimationUsingKeyFrames
+                                Storyboard.TargetName="BadgeBorder"
+                                Storyboard.TargetProperty="Visibility">
+                                <DiscreteObjectKeyFrame KeyTime="0:0:0.2" Value="Collapsed" />
+                            </ObjectAnimationUsingKeyFrames>
+                        </Storyboard>
+                    </VisualTransition>
+                    <VisualTransition From="Narrow" To="Wide" GeneratedDuration="0:0:0.2">
+                        <Storyboard>
+                            <ObjectAnimationUsingKeyFrames
+                                Storyboard.TargetName="BadgeBorder"
+                                Storyboard.TargetProperty="Visibility">
+                                <DiscreteObjectKeyFrame KeyTime="0:0:0" Value="Visible" />
+                            </ObjectAnimationUsingKeyFrames>
+                            <DoubleAnimation
+                                Storyboard.TargetName="BadgeBorder"
+                                Storyboard.TargetProperty="Opacity"
+                                From="0"
+                                To="1"
+                                Duration="0:0:0.2" />
+                        </Storyboard>
+                    </VisualTransition>
+                </VisualStateGroup.Transitions>
+                <VisualState x:Name="Narrow">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="BadgeBorder.Visibility" Value="Collapsed" />
+                        <Setter Target="BadgeBorder.Opacity" Value="0" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Wide">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="560" />
+                    </VisualState.StateTriggers>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
         <StackPanel>
-            <TextBlock Text="Display Presets" FontSize="22" FontWeight="SemiBold" />
+            <TextBlock Text="Display Presets" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
             <TextBlock
                 Text="Quickly switch resolution, refresh rate and DPI"
                 Style="{StaticResource FluxMutedTextStyle}"
-                Margin="0,4,0,0" />
+                Margin="0,4,0,0"
+                TextTrimming="CharacterEllipsis"
+                MaxLines="1" />
         </StackPanel>
         <Border
+            x:Name="BadgeBorder"
             Grid.Column="1"
             Background="#1AFFFFFF"
             CornerRadius="12"

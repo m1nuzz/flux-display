@@ -15,6 +15,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        TryApplyMinSize();
         ViewModel = new MainViewModel(App.Services);
         Activated += (_, _) => SetTitleBar(AppTitleBar);
         Closed += OnClosed;
@@ -164,6 +165,83 @@ public sealed partial class MainWindow : Window
             _ = ViewModel.SettingsViewModel.LoadAsync();
         }
     }
+
+    // Win32 subclass state for the min-size clamp (see TryApplyMinSize).
+    // Kept in fields so the delegate is never GC-collected.
+    private SubclassProc? _minSizeSubclass;
+    private int _minTrackWidth;
+    private int _minTrackHeight;
+
+    private void TryApplyMinSize()
+    {
+        try
+        {
+            // Project targets Windows App SDK 1.6, which has no
+            // OverlappedPresenter.PreferredMinimum* (added in 1.7), so clamp
+            // via WM_GETMINMAXINFO. 640x480 effective px also matches
+            // NavigationView's Auto breakpoint (LeftMinimal below 640).
+            var hwnd = WindowNative.GetWindowHandle(this);
+            uint dpi = GetDpiForWindow(hwnd);
+            double scale = dpi / 96.0;
+            _minTrackWidth = (int)(640 * scale);
+            _minTrackHeight = (int)(480 * scale);
+            _minSizeSubclass = MinSizeSubclassProc;
+            SetWindowSubclass(hwnd, _minSizeSubclass, 0, 0);
+        }
+        catch
+        {
+        }
+    }
+
+    private int MinSizeSubclassProc(nint hWnd, uint uMsg, nint wParam, nint lParam, nint uIdSubclass, nint dwRefData)
+    {
+        const uint WM_GETMINMAXINFO = 0x0024;
+        if (uMsg == WM_GETMINMAXINFO)
+        {
+            try
+            {
+                var mmi = System.Runtime.InteropServices.Marshal.PtrToStructure<MinMaxInfo>(lParam);
+                mmi.ptMinTrackSize.x = _minTrackWidth;
+                mmi.ptMinTrackSize.y = _minTrackHeight;
+                System.Runtime.InteropServices.Marshal.StructureToPtr(mmi, lParam, false);
+            }
+            catch
+            {
+            }
+
+            return 0;
+        }
+
+        return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct Point
+    {
+        public int x;
+        public int y;
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public Point ptReserved;
+        public Point ptMaxSize;
+        public Point ptMaxPosition;
+        public Point ptMinTrackSize;
+        public Point ptMaxTrackSize;
+    }
+
+    private delegate int SubclassProc(nint hWnd, uint uMsg, nint wParam, nint lParam, nint uIdSubclass, nint dwRefData);
+
+    [System.Runtime.InteropServices.DllImport("comctl32.dll", SetLastError = true)]
+    private static extern bool SetWindowSubclass(nint hWnd, SubclassProc pfnSubclass, nint uIdSubclass, nint dwRefData);
+
+    [System.Runtime.InteropServices.DllImport("comctl32.dll")]
+    private static extern int DefSubclassProc(nint hWnd, uint uMsg, nint wParam, nint lParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(nint hWnd);
 
     private void TryHookClosing()
     {

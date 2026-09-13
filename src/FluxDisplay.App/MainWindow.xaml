@@ -8,7 +8,6 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <controls:HeaderBar x:Name="AppTitleBar" />
         <NavigationView
@@ -16,7 +15,7 @@
             Grid.Row="1"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
-            PaneDisplayMode="Left"
+            PaneDisplayMode="Auto"
             SelectionChanged="NavView_SelectionChanged">
             <NavigationView.MenuItems>
                 <NavigationViewItem Content="Presets" Tag="presets" Icon="Home" />
@@ -28,6 +27,5 @@
             </NavigationView.MenuItems>
             <Frame x:Name="ContentFrame" />
         </NavigationView>
-        <controls:FooterFeatures Grid.Row="2" />
     </Grid>
 </Window>

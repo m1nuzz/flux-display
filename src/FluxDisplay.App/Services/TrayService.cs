@@ -327,6 +327,7 @@ public sealed class TrayService : ITrayService
             PreShowHostWindow();
             WarmMeasureInternalFlyout();
             LogPreShowState();
+            EnqueueMenuRescue();
             EnqueuePostShowState();
         }
         catch (Exception ex)
@@ -470,7 +471,11 @@ public sealed class TrayService : ITrayService
                 var host = typeof(TaskbarIcon).GetProperty("ContextMenuWindow", flags2)?.GetValue(_taskbarIcon) as Window;
                 if (host is not null)
                 {
-                    host.Activated += (_, args) => Helpers.AppLog.Info($"menu-host activated state={args.WindowActivationState}");
+                    // Hash identifies the exact window object; mismatch against
+                    // the preshow hash means the hook went stale (host recreated).
+                    var h = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(host);
+                    Helpers.AppLog.Info($"menu-hook host={h} flyout={System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(flyout)}");
+                    host.Activated += (_, args) => Helpers.AppLog.Info($"menu-host activated state={args.WindowActivationState} host={h}");
                 }
             }
             catch (Exception ex)
@@ -498,12 +503,85 @@ public sealed class TrayService : ITrayService
             var cached = t.GetProperty("ContextMenuWindowHandle", flags)?.GetValue(_taskbarIcon) as nint?;
             var scale = flyout?.XamlRoot?.RasterizationScale;
             var open = flyout?.IsOpen;
+            // Current host/flyout hashes plus the library's own visible flag.
+            // Compare host= with the menu-hook host= to spot stale hooks.
+            var curWin = t.GetProperty("ContextMenuWindow", flags)?.GetValue(_taskbarIcon) as Window;
+            var curHostHash = curWin is null ? 0 : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(curWin);
+            var curFlyHash = flyout is null ? 0 : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(flyout);
+            var hookedFlyHash = _hookedFlyout is null ? 0 : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(_hookedFlyout);
+            var visFlag = t.GetProperty("IsContextMenuVisible", flags)?.GetValue(_taskbarIcon);
             Helpers.AppLog.Info(
-                $"menu-show click xamlroot={(scale is null ? "null" : scale.ToString())} loaded={loaded} isopen={open} hwnd=0x{cached:X}");
+                $"menu-show click xamlroot={(scale is null ? "null" : scale.ToString())} loaded={loaded} isopen={open} hwnd=0x{cached:X} host={curHostHash} flyout={curFlyHash} hookedfly={hookedFlyHash} visflag={visFlag}");
         }
         catch (Exception ex)
         {
             Helpers.AppLog.Error(ex, "menu-show-state");
+        }
+    }
+
+    // Rescue for the 2.3.0 first-open race: the library calls ShowAt ONLY
+    // from the menu host's Activated handler. If activation never lands, the
+    // host sits visible with IsContextMenuVisible=true but the flyout closed
+    // (invisible first open, fine on the second click). ~250ms after the
+    // click, if the library is still mid-show AND the host ended up in the
+    // foreground, open the internal flyout directly — same ShowAt the library
+    // would have run. The foreground check is the safety: an already-active
+    // host gets no further Activated events, so the library can no longer
+    // ShowAt and a double-open is impossible. If the host is NOT foreground
+    // (activation genuinely denied), we stay out of the way.
+    private void EnqueueMenuRescue()
+    {
+        try
+        {
+            App.MainWindow?.DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    await Task.Delay(250).ConfigureAwait(true);
+                    const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+                    var t = typeof(TaskbarIcon);
+                    var flyout = t.GetProperty("ContextMenuFlyout", flags)?.GetValue(_taskbarIcon) as MenuFlyout;
+                    if (flyout is null || flyout.IsOpen)
+                    {
+                        return;
+                    }
+
+                    if (t.GetProperty("IsContextMenuVisible", flags)?.GetValue(_taskbarIcon) is not true)
+                    {
+                        return;
+                    }
+
+                    var handle = GetMenuHostHandle();
+                    if (handle == 0 || !IsWindow(handle) || !IsWindowVisible(handle))
+                    {
+                        return;
+                    }
+
+                    var fg = GetForegroundWindow();
+                    Helpers.AppLog.Info($"menu-rescue check fg=0x{fg.ToInt64():X} host=0x{handle:X}");
+                    if (fg.ToInt64() != handle)
+                    {
+                        return;
+                    }
+
+                    var anchor = (t.GetProperty("ContextMenuWindow", flags)?.GetValue(_taskbarIcon) as Window)?.Content as FrameworkElement;
+                    if (anchor is null)
+                    {
+                        return;
+                    }
+
+                    flyout.ShowAt(anchor, new FlyoutShowOptions { ShowMode = FlyoutShowMode.Transient });
+                    Helpers.AppLog.Info("menu-rescue ShowAt fired");
+                }
+                catch (Exception ex)
+                {
+                    Helpers.AppLog.Error(ex, "menu-rescue");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "menu-rescue.schedule");
         }
     }
 
@@ -1032,4 +1110,7 @@ public sealed class TrayService : ITrayService
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
 }

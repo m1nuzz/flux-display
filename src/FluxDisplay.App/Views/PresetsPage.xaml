@@ -19,7 +19,7 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBlock Text="Your presets" Style="{StaticResource FluxPageTitleStyle}" />
+            <TextBlock Text="Your presets" Style="{StaticResource FluxPageTitleStyle}" TextTrimming="CharacterEllipsis" />
             <Button
                 Grid.Column="1"
                 Content="+ Add preset"
