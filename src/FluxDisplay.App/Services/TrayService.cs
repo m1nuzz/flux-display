@@ -751,6 +751,13 @@ public sealed class TrayService : ITrayService
 
         var flyout = new MenuFlyout();
 
+        // Tray menus must pop instantly: no open/close slide (on a bottom
+        // taskbar the default animation even runs the wrong way, top-down
+        // while the menu extends upward). Also less composition work on the
+        // transparent SecondWindow host, where animated frames can lag
+        // behind fast pointer movement and make hover highlight feel jumpy.
+        flyout.AreOpenCloseAnimationsEnabled = false;
+
         // Force dark theme for tray menu to match reference (navy #081827, rounded).
         // NOTE: keep presenter style minimal (theme + background only) — replacing the
         // full default style breaks layout. Width is enforced per-item below (flyout
