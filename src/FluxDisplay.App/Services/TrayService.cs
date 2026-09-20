@@ -463,7 +463,15 @@ public sealed class TrayService : ITrayService
 
             _hookedFlyout = flyout;
             flyout.Opened += (_, _) => Helpers.AppLog.Info("menu-flyout opened");
-            flyout.Closed += (_, _) => Helpers.AppLog.Info("menu-flyout closed");
+            flyout.Closed += (_, _) =>
+            {
+                Helpers.AppLog.Info("menu-flyout closed");
+                if (_displayChangeRewarmPending)
+                {
+                    _displayChangeRewarmPending = false;
+                    RunDisplayChangeRewarm();
+                }
+            };
 
             try
             {
@@ -1091,6 +1099,80 @@ public sealed class TrayService : ITrayService
         catch (Exception ex)
         {
             Helpers.AppLog.Error(ex, "menu-host park");
+        }
+    }
+
+    private int _displayChangeGen;
+    private bool _displayChangeRewarmPending;
+
+    // WM_DISPLAYCHANGE entry (via MainWindow's subclass): res/DPI switch.
+    // The hidden menu host keeps a stale RasterizationScale until shown, and
+    // the library sizes the host from MeasureFlyout * that stale scale, so
+    // the first menu open after a mode switch renders small/clipped with a
+    // scrollbar; the second open is fine. Fix: after the switch settles,
+    // briefly show the host (no activation) so it picks up the new scale,
+    // then re-measure. Bursts coalesce via the generation counter.
+    public void NotifyDisplaySettingsChanged()
+    {
+        try
+        {
+            var gen = System.Threading.Interlocked.Increment(ref _displayChangeGen);
+            Helpers.AppLog.Info("menu-displaychange received");
+            AsyncHelper.FireAndForget(async () =>
+            {
+                try
+                {
+                    await Task.Delay(1500).ConfigureAwait(false);
+                    if (gen != System.Threading.Volatile.Read(ref _displayChangeGen))
+                    {
+                        return;
+                    }
+
+                    await AsyncHelper.EnqueueAsync(RunDisplayChangeRewarm).ConfigureAwait(false);
+                }
+                catch
+                {
+                }
+            });
+        }
+        catch
+        {
+        }
+    }
+
+    private void RunDisplayChangeRewarm()
+    {
+        try
+        {
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            var flyout = typeof(TaskbarIcon).GetProperty("ContextMenuFlyout", flags)?.GetValue(_taskbarIcon) as MenuFlyout;
+            if (flyout is not null && flyout.IsOpen)
+            {
+                // Never touch the host under an open menu: defer to Closed.
+                _displayChangeRewarmPending = true;
+                Helpers.AppLog.Info("menu-displaychange rewarm deferred (menu open)");
+                return;
+            }
+
+            var h = GetMenuHostHandle();
+            var wasVisible = h != 0 && IsWindow(h) && IsWindowVisible(h);
+            PreShowHostWindow();
+            RefreshMenuItems();
+            WarmMeasureInternalFlyout();
+            if (!wasVisible)
+            {
+                var h2 = GetMenuHostHandle();
+                if (h2 != 0 && IsWindow(h2))
+                {
+                    _ = ShowWindow(h2, 0);
+                }
+            }
+
+            Helpers.AppLog.Info($"menu-displaychange rewarm done wasVisible={wasVisible}");
+        }
+        catch (Exception ex)
+        {
+            Helpers.AppLog.Error(ex, "menu-displaychange rewarm");
         }
     }
 

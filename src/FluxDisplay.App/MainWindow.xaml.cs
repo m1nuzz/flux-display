@@ -196,6 +196,23 @@ public sealed partial class MainWindow : Window
     private int MinSizeSubclassProc(nint hWnd, uint uMsg, nint wParam, nint lParam, nint uIdSubclass, nint dwRefData)
     {
         const uint WM_GETMINMAXINFO = 0x0024;
+        const uint WM_DISPLAYCHANGE = 0x007E;
+        if (uMsg == WM_DISPLAYCHANGE)
+        {
+            // Res/DPI switch (also fired by our own preset applies): the tray
+            // menu host caches scale until shown. Notify async, never block
+            // the window proc. Hidden windows still receive this broadcast.
+            try
+            {
+                App.Services.Tray.NotifyDisplaySettingsChanged();
+            }
+            catch
+            {
+            }
+
+            return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+        }
+
         if (uMsg == WM_GETMINMAXINFO)
         {
             try

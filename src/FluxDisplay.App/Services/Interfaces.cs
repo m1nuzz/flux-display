@@ -42,6 +42,11 @@ public interface ITrayService : IDisposable
     // tray), unless its flyout is currently open. A host left visible
     // (transparent layered window) is composited every vsync forever.
     void ParkMenuHost();
+    // Resolution/DPI switch notification (WM_DISPLAYCHANGE). The hidden menu
+    // host keeps a stale RasterizationScale until shown, so the next menu
+    // open would measure small/clipped. Debounces internally and re-warms
+    // the host + measurement after the switch settles.
+    void NotifyDisplaySettingsChanged();
     event EventHandler? OpenRequested;
     event EventHandler<Guid>? PresetApplyRequested;
 }
