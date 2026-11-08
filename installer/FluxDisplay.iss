@@ -33,6 +33,7 @@ OutputDir=..\artifacts
 OutputBaseFilename=FluxDisplay-win-x64-setup
 SetupIconFile=..\src\FluxDisplay.App\Assets\tray.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
+LicenseFile=..\LICENSE
 Compression=lzma2/max
 SolidCompression=yes
 ; Forced dark appearance for Setup and Uninstall (built-in dark style).

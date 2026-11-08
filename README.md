@@ -5,6 +5,7 @@ Windows 11 tray app for saving and applying display presets. One preset can cove
 Presets live in `%LOCALAPPDATA%\FluxDisplay\presets.json` and are applied with `ChangeDisplaySettingsEx`.
 
 [![CI](https://github.com/m1nuzz/flux-display/actions/workflows/ci.yml/badge.svg)](https://github.com/m1nuzz/flux-display/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-2ea44f.svg)](https://github.com/m1nuzz/flux-display/blob/main/LICENSE)
 
 ## Features
 
@@ -87,4 +88,10 @@ Stack: C# 12, .NET 8, Windows App SDK 1.6, WinUI 3, CommunityToolkit.Mvvm, H.Not
 
 ## License
 
-MIT. See `LICENSE`.
+Flux Display is distributed under the [GNU Affero General Public License, version 3 or later](LICENSE) (AGPL-3.0-or-later).
+
+Running Flux Display, including inside a company, needs no commercial license. Parties that want to embed it in a proprietary product, ship a white-label or OEM build, or offer it as a hosted service can obtain a commercial license — see [COMMERCIAL.md](COMMERCIAL.md).
+
+Contributions are accepted under the [Contributor License Agreement](CLA.md), which keeps the project able to offer both the AGPL and commercial licenses.
+
+Third-party dependencies keep their own licenses; their notices must be preserved.
