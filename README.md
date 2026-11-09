@@ -5,7 +5,7 @@ Windows 11 tray app for saving and applying display presets. One preset can cove
 Presets live in `%LOCALAPPDATA%\FluxDisplay\presets.json` and are applied with `ChangeDisplaySettingsEx`.
 
 [![CI](https://github.com/m1nuzz/flux-display/actions/workflows/ci.yml/badge.svg)](https://github.com/m1nuzz/flux-display/actions/workflows/ci.yml)
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-2ea44f.svg)](https://github.com/m1nuzz/flux-display/blob/main/LICENSE)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-2ea44f.svg)](https://github.com/m1nuzz/flux-display/blob/main/LICENSE)
 
 ## Features
 
@@ -88,10 +88,10 @@ Stack: C# 12, .NET 8, Windows App SDK 1.6, WinUI 3, CommunityToolkit.Mvvm, H.Not
 
 ## License
 
-Flux Display is distributed under the [GNU Affero General Public License, version 3 or later](LICENSE) (AGPL-3.0-or-later).
+Flux Display is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE). It is free for personal and other noncommercial use as defined by the license. This is a source-available license, not an OSI-approved open-source license.
 
-Running Flux Display, including inside a company, needs no commercial license. Parties that want to embed it in a proprietary product, ship a white-label or OEM build, or offer it as a hosted service can obtain a commercial license — see [COMMERCIAL.md](COMMERCIAL.md).
+Any commercial use — including use by or for a business, internal business use, paid distribution, a white-label or OEM build, or a hosted service — requires a paid commercial license. See [COMMERCIAL.md](COMMERCIAL.md).
 
-Contributions are accepted under the [Contributor License Agreement](CLA.md), which keeps the project able to offer both the AGPL and commercial licenses.
+Contributions are accepted under the [Contributor License Agreement](CLA.md), which keeps the project able to offer both the noncommercial and commercial licenses.
 
-Third-party dependencies keep their own licenses; their notices must be preserved.
+Versions released before this license change remain under the license they were published with. Third-party dependencies keep their own licenses; their notices must be preserved.
